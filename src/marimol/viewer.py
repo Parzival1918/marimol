@@ -34,7 +34,50 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(container.clientWidth, container.clientHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.autoClear = false; // We need to manage clearing for multiple viewports
             container.appendChild(renderer.domElement);
+
+            // Axes setup (overlay)
+            const axesScene = new THREE.Scene();
+            
+            // Custom Thick Axes
+            const createAxis = (color, euler) => {
+                const material = new THREE.MeshBasicMaterial({ color: color });
+                const geometry = new THREE.CylinderGeometry(0.06, 0.06, 1.5, 8);
+                geometry.translate(0, 0.75, 0); 
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.setRotationFromEuler(euler);
+                axesScene.add(mesh);
+            };
+            
+            createAxis(0xff4444, new THREE.Euler(0, 0, -Math.PI/2)); // X (Red)
+            createAxis(0x44ff44, new THREE.Euler(0, 0, 0));          // Y (Green)
+            createAxis(0x4444ff, new THREE.Euler(Math.PI/2, 0, 0));  // Z (Blue)
+            
+            // Canvas sprites for Labels
+            const createLabel = (text, color, pos) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128; canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.font = 'bold 96px sans-serif';
+                ctx.fillStyle = color;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, 64, 64);
+                
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+                const sprite = new THREE.Sprite(spriteMat);
+                sprite.position.copy(pos);
+                sprite.scale.set(1.2, 1.2, 1.2);
+                axesScene.add(sprite);
+            };
+            
+            createLabel('X', '#ff4444', new THREE.Vector3(1.8, 0, 0));
+            createLabel('Y', '#44ff44', new THREE.Vector3(0, 1.8, 0));
+            createLabel('Z', '#4444ff', new THREE.Vector3(0, 0, 1.8));
+            // Orthographic bounds: left, right, top, bottom, near, far
+            const axesCamera = new THREE.OrthographicCamera(-2.5, 2.5, 2.5, -2.5, 0.1, 10);
 
             const controls = new TrackballControls(camera, renderer.domElement);
             controls.rotateSpeed = 3.0;
@@ -252,7 +295,24 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             function animate() {
                 animationId = requestAnimationFrame(animate);
                 controls.update();
+                
+                // 1. Render main scene
+                renderer.setViewport(0, 0, container.clientWidth, container.clientHeight);
+                renderer.clear();
                 renderer.render(scene, camera);
+                
+                // 2. Render axes overlay in bottom left if requested
+                if (model.get('show_axes')) {
+                    // Position axes camera behind the origin to match main camera orientation
+                    axesCamera.position.copy(camera.position).sub(controls.target).normalize().multiplyScalar(4);
+                    // Instead of lookAt (which suffers from Gimbal lock when aligned with Y), directly copy the exact rotation
+                    axesCamera.quaternion.copy(camera.quaternion);
+                    
+                    renderer.clearDepth();
+                    // Draw in bottom left corner (80x80)
+                    renderer.setViewport(10, 10, 80, 80);
+                    renderer.render(axesScene, axesCamera);
+                }
             }
             animate();
 
@@ -274,19 +334,22 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     selected_atom_index = traitlets.Int(-1).tag(sync=True)
     background_color = traitlets.Unicode('#ffffff').tag(sync=True)
     style = traitlets.Unicode('vdw').tag(sync=True) # options: 'vdw', 'ball-and-stick', 'wireframe'
+    show_axes = traitlets.Bool(False).tag(sync=True)
 
-def view_molecule(atoms, bonds=None, style="vdw", background_color="white"):
+def view_molecule(atoms, bonds=None, style="vdw", background_color="white", show_axes=False):
     """
     Visualize a list of atoms using WebGL (Three.js).
     atoms format: [{"position": [x, y, z], "color": [r, g, b], "radius": r}, ...]
     bonds format: [{"source": i, "target": j}, ...]
     style options: 'vdw' (default), 'ball-and-stick', 'wireframe'
+    show_axes: bool, whether to display XYZ axes in the corner
     """
     resolved_bg = resolve_color(background_color)
     widget = MoleculeViewerWidget(
         atoms=atoms,
         bonds=bonds or [],
         style=style,
-        background_color=resolved_bg
+        background_color=resolved_bg,
+        show_axes=show_axes
     )
     return mo.ui.anywidget(widget)

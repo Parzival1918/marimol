@@ -16,13 +16,13 @@ def _():
         {"position": [-0.75, 0.58, 0.0], "color": get_color("H"), "radius": get_radius("H")},
     ]
 
-    viewer = view_molecule(atoms, style="ball-and-stick")
+    viewer = view_molecule(atoms, style="wireframe", show_axes=True)
     return mo, viewer
 
 
 @app.cell
-def _(viewer):
-    viewer
+def _(mo, text, viewer):
+    mo.vstack([viewer, text])
     return
 
 
@@ -33,8 +33,7 @@ def _(mo, viewer):
         text = mo.md("### No atom selected. Click an atom to select it.")
     else:
         text = mo.md(f"### Selected Atom Index: **{viewer.selected_atom_index}**")
-    text
-    return
+    return (text,)
 
 
 if __name__ == "__main__":
