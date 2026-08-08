@@ -23,7 +23,7 @@ def _():
         [0.0, 0.0, 2.0]
     ]
 
-    viewer = view_molecule(atoms, unit_cell=unit_cell, style="wireframe", show_axes=True)
+    viewer = view_molecule(atoms, unit_cell=unit_cell, style="ball-and-stick", show_axes=True, projection="orthographic")
     return mo, viewer
 
 

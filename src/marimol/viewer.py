@@ -29,7 +29,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             dirLight.position.set(10, 20, 10);
             scene.add(dirLight);
 
-            const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            const persCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            const orthoCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000);
+            let camera = model.get('projection') === 'orthographic' ? orthoCamera : persCamera;
             
             const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(container.clientWidth, container.clientHeight);
@@ -70,6 +72,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const sprite = new THREE.Sprite(spriteMat);
                 sprite.position.copy(pos);
                 sprite.scale.set(1.2, 1.2, 1.2);
+                sprite.name = text; // Give a name for raycasting identification
                 axesScene.add(sprite);
             };
             
@@ -293,6 +296,17 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 }
                 
                 const cameraDist = Math.max(10, maxDist * 3);
+                
+                if (camera.isOrthographicCamera) {
+                    const aspect = container.clientWidth / container.clientHeight;
+                    // Provide a 1.5x margin so the molecule fits comfortably
+                    camera.left = -maxDist * aspect * 1.5;
+                    camera.right = maxDist * aspect * 1.5;
+                    camera.top = maxDist * 1.5;
+                    camera.bottom = -maxDist * 1.5;
+                    camera.updateProjectionMatrix();
+                }
+                
                 camera.position.set(sceneCenter.x, sceneCenter.y, sceneCenter.z + cameraDist);
                 controls.update();
             }
@@ -304,6 +318,24 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             model.on("change:unit_cell", updateScene);
             model.on("change:background_color", () => {
                 container.style.backgroundColor = model.get('background_color');
+            });
+            model.on("change:projection", () => {
+                const newProj = model.get('projection');
+                const newCamera = newProj === 'orthographic' ? orthoCamera : persCamera;
+                if (camera !== newCamera) {
+                    newCamera.position.copy(camera.position);
+                    newCamera.quaternion.copy(camera.quaternion);
+                    
+                    camera = newCamera;
+                    controls.object = camera;
+                    
+                    if (panX !== 0 || panY !== 0) {
+                        camera.setViewOffset(container.clientWidth, container.clientHeight, panX, panY, container.clientWidth, container.clientHeight);
+                    } else {
+                        camera.clearViewOffset();
+                    }
+                    updateScene();
+                }
             });
             updateScene();
 
@@ -341,7 +373,16 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             // Handle Resize
             const resizeObserver = new ResizeObserver(() => {
                 if (container.clientWidth === 0 || container.clientHeight === 0) return;
-                camera.aspect = container.clientWidth / container.clientHeight;
+                const aspect = container.clientWidth / container.clientHeight;
+                
+                if (camera.isOrthographicCamera) {
+                    const height = camera.top;
+                    camera.left = -height * aspect;
+                    camera.right = height * aspect;
+                } else {
+                    camera.aspect = aspect;
+                }
+                
                 if (panX !== 0 || panY !== 0) {
                     camera.setViewOffset(container.clientWidth, container.clientHeight, panX, panY, container.clientWidth, container.clientHeight);
                 } else {
@@ -353,11 +394,46 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             });
             resizeObserver.observe(container);
 
-            // Handle Click (Picking)
+            // Handle Click (Picking or Axis Snapping)
             container.addEventListener('click', (event) => {
                 const rect = container.getBoundingClientRect();
-                mouse.x = ((event.clientX - rect.left) / container.clientWidth) * 2 - 1;
-                mouse.y = -((event.clientY - rect.top) / container.clientHeight) * 2 + 1;
+                const cx = event.clientX - rect.left;
+                const cy = event.clientY - rect.top;
+
+                // 1. Check if click is inside the axes overlay (bottom left, 10 to 90)
+                if (model.get('show_axes') && cx >= 10 && cx <= 90 && cy >= container.clientHeight - 90 && cy <= container.clientHeight - 10) {
+                    const axX = ((cx - 10) / 80) * 2 - 1;
+                    const axY = -((cy - (container.clientHeight - 90)) / 80) * 2 + 1;
+                    
+                    const axesMouse = new THREE.Vector2(axX, axY);
+                    raycaster.setFromCamera(axesMouse, axesCamera);
+                    const intersects = raycaster.intersectObjects(axesScene.children, true);
+                    
+                    if (intersects.length > 0) {
+                        for (const hit of intersects) {
+                            if (hit.object.name === 'X' || hit.object.name === 'Y' || hit.object.name === 'Z') {
+                                const dist = camera.position.distanceTo(controls.target);
+                                if (hit.object.name === 'X') {
+                                    camera.position.copy(controls.target).add(new THREE.Vector3(dist, 0, 0));
+                                    camera.up.set(0, 1, 0);
+                                } else if (hit.object.name === 'Y') {
+                                    camera.position.copy(controls.target).add(new THREE.Vector3(0, dist, 0));
+                                    camera.up.set(0, 0, -1);
+                                } else if (hit.object.name === 'Z') {
+                                    camera.position.copy(controls.target).add(new THREE.Vector3(0, 0, dist));
+                                    camera.up.set(0, 1, 0);
+                                }
+                                camera.lookAt(controls.target);
+                                controls.update();
+                                return; // Stop processing, we handled the axes click
+                            }
+                        }
+                    }
+                }
+
+                // 2. Otherwise process atom picking in the main scene
+                mouse.x = (cx / container.clientWidth) * 2 - 1;
+                mouse.y = -(cy / container.clientHeight) * 2 + 1;
 
                 raycaster.setFromCamera(mouse, camera);
 
@@ -421,8 +497,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     background_color = traitlets.Unicode('#ffffff').tag(sync=True)
     style = traitlets.Unicode('vdw').tag(sync=True) # options: 'vdw', 'ball-and-stick', 'wireframe'
     show_axes = traitlets.Bool(False).tag(sync=True)
+    projection = traitlets.Unicode('perspective').tag(sync=True) # 'perspective' or 'orthographic'
 
-def view_molecule(atoms, bonds=None, unit_cell=None, style="vdw", background_color="white", show_axes=False):
+def view_molecule(atoms, bonds=None, unit_cell=None, style="vdw", background_color="white", show_axes=False, projection="perspective"):
     """
     Visualize a list of atoms using WebGL (Three.js).
     atoms format: [{"position": [x, y, z], "color": [r, g, b], "radius": r}, ...]
@@ -430,6 +507,7 @@ def view_molecule(atoms, bonds=None, unit_cell=None, style="vdw", background_col
     unit_cell format: [[v1x, v1y, v1z], [v2x, v2y, v2z], [v3x, v3y, v3z]]
     style options: 'vdw' (default), 'ball-and-stick', 'wireframe'
     show_axes: bool, whether to display XYZ axes in the corner
+    projection: 'perspective' (default) or 'orthographic'
     """
     resolved_bg = resolve_color(background_color)
     widget = MoleculeViewerWidget(
@@ -438,6 +516,7 @@ def view_molecule(atoms, bonds=None, unit_cell=None, style="vdw", background_col
         unit_cell=unit_cell or [],
         style=style,
         background_color=resolved_bg,
-        show_axes=show_axes
+        show_axes=show_axes,
+        projection=projection
     )
     return mo.ui.anywidget(widget)
