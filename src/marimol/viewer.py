@@ -76,13 +76,13 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 return sprite;
             };
             
-            const xLbl = createLabel('X', '#ff4444', new THREE.Vector3(1.8, 0, 0), false);
+            const xLbl = createLabel('X', '#ff4444', new THREE.Vector3(1.8, 0, 0), true);
             xLbl.scale.set(1.2, 1.2, 1.2); axesScene.add(xLbl);
             
-            const yLbl = createLabel('Y', '#44ff44', new THREE.Vector3(0, 1.8, 0), false);
+            const yLbl = createLabel('Y', '#44ff44', new THREE.Vector3(0, 1.8, 0), true);
             yLbl.scale.set(1.2, 1.2, 1.2); axesScene.add(yLbl);
             
-            const zLbl = createLabel('Z', '#4444ff', new THREE.Vector3(0, 0, 1.8), false);
+            const zLbl = createLabel('Z', '#4444ff', new THREE.Vector3(0, 0, 1.8), true);
             zLbl.scale.set(1.2, 1.2, 1.2); axesScene.add(zLbl);
             // Orthographic bounds: left, right, top, bottom, near, far
             const axesCamera = new THREE.OrthographicCamera(-2.5, 2.5, 2.5, -2.5, 0.1, 10);
