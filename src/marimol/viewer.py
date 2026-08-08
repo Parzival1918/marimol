@@ -49,9 +49,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 shininess: 60
             });
             const cylinderGeometry = new THREE.CylinderGeometry(1, 1, 1, 16);
-            // Cylinder is along Y axis by default, length 1.
             const cylinderMaterial = new THREE.MeshPhongMaterial({
-                color: 0xcccccc,
+                color: 0xffffff,
                 shininess: 60
             });
             
@@ -146,36 +145,48 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
                 // --- BONDS ---
                 if (showBonds && bonds.length > 0) {
-                    bondMesh = new THREE.InstancedMesh(cylinderGeometry, cylinderMaterial, bonds.length);
+                    bondMesh = new THREE.InstancedMesh(cylinderGeometry, cylinderMaterial, bonds.length * 2);
                     const vA = new THREE.Vector3();
                     const vB = new THREE.Vector3();
                     const vDir = new THREE.Vector3();
+                    const vMid = new THREE.Vector3();
                     
                     for (let i = 0; i < bonds.length; i++) {
                         const b = bonds[i];
-                        const a1 = atoms[b.source].position;
-                        const a2 = atoms[b.target].position;
+                        const atomA = atoms[b.source];
+                        const atomB = atoms[b.target];
                         
-                        vA.set(a1[0], a1[1], a1[2]);
-                        vB.set(a2[0], a2[1], a2[2]);
+                        vA.fromArray(atomA.position || [0,0,0]);
+                        vB.fromArray(atomB.position || [0,0,0]);
+                        vMid.copy(vA).lerp(vB, 0.5);
                         
-                        const distance = vA.distanceTo(vB);
-                        const center = vA.clone().lerp(vB, 0.5);
-                        
-                        dummy.position.copy(center);
-                        // Cylinder geometry length is 1, so scale Y to distance
-                        dummy.scale.set(bondRadius, distance, bondRadius);
-                        
+                        const distance = vA.distanceTo(vMid);
                         vDir.subVectors(vB, vA).normalize();
+                        
+                        // First half (Atom A to Midpoint)
+                        dummy.position.copy(vA).lerp(vMid, 0.5);
+                        dummy.scale.set(bondRadius, distance, bondRadius);
                         dummy.quaternion.setFromUnitVectors(yAxis, vDir);
                         dummy.updateMatrix();
+                        bondMesh.setMatrixAt(i * 2, dummy.matrix);
                         
-                        bondMesh.setMatrixAt(i, dummy.matrix);
-                        // Optional: bonds take color of atoms? Here they are just gray.
-                        // colorObj.setHex(0xcccccc);
-                        // bondMesh.setColorAt(i, colorObj);
+                        const colA = atomA.color || [1,1,1];
+                        colorObj.setRGB(colA[0], colA[1], colA[2]);
+                        bondMesh.setColorAt(i * 2, colorObj);
+                        
+                        // Second half (Midpoint to Atom B)
+                        dummy.position.copy(vMid).lerp(vB, 0.5);
+                        dummy.scale.set(bondRadius, distance, bondRadius);
+                        // quaternion stays the same since direction is the same
+                        dummy.updateMatrix();
+                        bondMesh.setMatrixAt(i * 2 + 1, dummy.matrix);
+                        
+                        const colB = atomB.color || [1,1,1];
+                        colorObj.setRGB(colB[0], colB[1], colB[2]);
+                        bondMesh.setColorAt(i * 2 + 1, colorObj);
                     }
                     bondMesh.instanceMatrix.needsUpdate = true;
+                    if (bondMesh.instanceColor) bondMesh.instanceColor.needsUpdate = true;
                     scene.add(bondMesh);
                 }
 
