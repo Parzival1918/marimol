@@ -6,7 +6,7 @@ from .color_utils import resolve_color
 class MoleculeViewerWidget(anywidget.AnyWidget):
     _esm = """
     import * as THREE from 'https://esm.sh/three@0.160.0';
-    import { OrbitControls } from 'https://esm.sh/three@0.160.0/addons/controls/OrbitControls.js';
+    import { TrackballControls } from 'https://esm.sh/three@0.160.0/addons/controls/TrackballControls.js';
 
     export default {
         render({ model, el }) {
@@ -36,9 +36,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             renderer.setPixelRatio(window.devicePixelRatio);
             container.appendChild(renderer.domElement);
 
-            const controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.1;
+            const controls = new TrackballControls(camera, renderer.domElement);
+            controls.rotateSpeed = 3.0;
+            controls.zoomSpeed = 1.2;
+            controls.panSpeed = 0.8;
 
             // Geometry and Material for Atoms
             // We use a high segment count for smooth spheres, but InstancedMesh keeps it incredibly fast
@@ -209,6 +210,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 camera.aspect = container.clientWidth / container.clientHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(container.clientWidth, container.clientHeight);
+                controls.handleResize();
             });
             resizeObserver.observe(container);
 
