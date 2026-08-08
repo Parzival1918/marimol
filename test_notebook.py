@@ -16,7 +16,14 @@ def _():
         {"position": [-0.75, 0.58, 0.0], "color": get_color("H"), "radius": get_radius("H")},
     ]
 
-    viewer = view_molecule(atoms, style="wireframe", show_axes=True)
+    # Example 3x3 unit cell matrix (simple cubic, side length 2.0 A)
+    unit_cell = [
+        [2.0, 0.0, 0.0],
+        [0.0, 2.0, 0.0],
+        [0.0, 0.0, 2.0]
+    ]
+
+    viewer = view_molecule(atoms, unit_cell=unit_cell, style="wireframe", show_axes=True)
     return mo, viewer
 
 

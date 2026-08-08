@@ -83,6 +83,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             controls.rotateSpeed = 3.0;
             controls.zoomSpeed = 1.2;
             controls.panSpeed = 0.8;
+            controls.noPan = true; // We use custom panning via setViewOffset to preserve the rotation center
 
             // Geometry and Material for Atoms
             // We use a high segment count for smooth spheres, but InstancedMesh keeps it incredibly fast
@@ -99,6 +100,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             
             let atomMesh = null; // InstancedMesh for atoms
             let bondMesh = null; // InstancedMesh for bonds
+            let cellMesh = null; // LineSegments for unit cell
             
             const dummy = new THREE.Object3D();
             const colorObj = new THREE.Color();
@@ -116,8 +118,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 // Clear old meshes
                 if (atomMesh) { scene.remove(atomMesh); atomMesh.dispose(); atomMesh = null; }
                 if (bondMesh) { scene.remove(bondMesh); bondMesh.dispose(); bondMesh = null; }
-
-                if (numAtoms === 0) return;
+                if (cellMesh) { scene.remove(cellMesh); cellMesh.geometry.dispose(); cellMesh.material.dispose(); cellMesh = null; }
 
                 // Auto-compute bonds if not provided and style needs them
                 if (bonds.length === 0 && (style === 'ball-and-stick' || style === 'wireframe')) {
@@ -233,19 +234,66 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     scene.add(bondMesh);
                 }
 
+                // --- UNIT CELL ---
+                const unitCell = model.get('unit_cell');
+                let cellCenter = null;
+                if (unitCell && unitCell.length === 3) {
+                    const v1 = new THREE.Vector3().fromArray(unitCell[0]);
+                    const v2 = new THREE.Vector3().fromArray(unitCell[1]);
+                    const v3 = new THREE.Vector3().fromArray(unitCell[2]);
+                    
+                    const vertices = [];
+                    const addEdge = (p1, p2) => {
+                        vertices.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+                    };
+                    
+                    const origin = new THREE.Vector3(0,0,0);
+                    const p12 = v1.clone().add(v2);
+                    const p13 = v1.clone().add(v3);
+                    const p23 = v2.clone().add(v3);
+                    const p123 = v1.clone().add(v2).add(v3);
+                    
+                    addEdge(origin, v1); addEdge(origin, v2); addEdge(origin, v3);
+                    addEdge(v1, p12); addEdge(v1, p13);
+                    addEdge(v2, p12); addEdge(v2, p23);
+                    addEdge(v3, p13); addEdge(v3, p23);
+                    addEdge(p12, p123); addEdge(p13, p123); addEdge(p23, p123);
+                    
+                    const geo = new THREE.BufferGeometry();
+                    geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                    const mat = new THREE.LineBasicMaterial({ color: 0x888888 });
+                    cellMesh = new THREE.LineSegments(geo, mat);
+                    scene.add(cellMesh);
+                    
+                    cellCenter = p123.clone().multiplyScalar(0.5);
+                }
+
+                if (numAtoms === 0 && !cellMesh) return;
+
                 // Auto-center and fit camera
-                centerSum.divideScalar(numAtoms);
-                controls.target.copy(centerSum);
+                const sceneCenter = new THREE.Vector3();
+                if (cellCenter) {
+                    sceneCenter.copy(cellCenter);
+                } else if (numAtoms > 0) {
+                    centerSum.divideScalar(numAtoms);
+                    sceneCenter.copy(centerSum);
+                }
+                controls.target.copy(sceneCenter);
                 
                 let maxDist = 0;
-                for (let i = 0; i < numAtoms; i++) {
-                    const pos = new THREE.Vector3().fromArray(atoms[i].position);
-                    const dist = pos.distanceTo(centerSum);
-                    if (dist > maxDist) maxDist = dist;
+                if (cellCenter) {
+                    // Base maxDist on the distance from cell center to the origin (half the main diagonal)
+                    maxDist = cellCenter.length();
+                } else if (numAtoms > 0) {
+                    for (let i = 0; i < numAtoms; i++) {
+                        const pos = new THREE.Vector3().fromArray(atoms[i].position);
+                        const dist = pos.distanceTo(sceneCenter);
+                        if (dist > maxDist) maxDist = dist;
+                    }
                 }
                 
                 const cameraDist = Math.max(10, maxDist * 3);
-                camera.position.set(centerSum.x, centerSum.y, centerSum.z + cameraDist);
+                camera.position.set(sceneCenter.x, sceneCenter.y, sceneCenter.z + cameraDist);
                 controls.update();
             }
 
@@ -253,15 +301,52 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             model.on("change:atoms", updateScene);
             model.on("change:bonds", updateScene);
             model.on("change:style", updateScene);
+            model.on("change:unit_cell", updateScene);
             model.on("change:background_color", () => {
                 container.style.backgroundColor = model.get('background_color');
             });
             updateScene();
 
+            // Custom Panning using viewOffset
+            let panX = 0;
+            let panY = 0;
+            let isPanning = false;
+
+            container.addEventListener('contextmenu', e => e.preventDefault());
+            
+            container.addEventListener('mousedown', (e) => {
+                if (e.button === 2) {
+                    isPanning = true;
+                }
+            });
+            container.addEventListener('mousemove', (e) => {
+                if (isPanning) {
+                    panX -= e.movementX;
+                    panY -= e.movementY;
+                    camera.setViewOffset(
+                        container.clientWidth, container.clientHeight,
+                        panX, panY,
+                        container.clientWidth, container.clientHeight
+                    );
+                    camera.updateProjectionMatrix();
+                }
+            });
+            container.addEventListener('mouseup', (e) => {
+                if (e.button === 2) isPanning = false;
+            });
+            container.addEventListener('mouseleave', () => {
+                isPanning = false;
+            });
+
             // Handle Resize
             const resizeObserver = new ResizeObserver(() => {
                 if (container.clientWidth === 0 || container.clientHeight === 0) return;
                 camera.aspect = container.clientWidth / container.clientHeight;
+                if (panX !== 0 || panY !== 0) {
+                    camera.setViewOffset(container.clientWidth, container.clientHeight, panX, panY, container.clientWidth, container.clientHeight);
+                } else {
+                    camera.clearViewOffset();
+                }
                 camera.updateProjectionMatrix();
                 renderer.setSize(container.clientWidth, container.clientHeight);
                 controls.handleResize();
@@ -331,16 +416,18 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     """
     atoms = traitlets.List().tag(sync=True)
     bonds = traitlets.List(default_value=[]).tag(sync=True)
+    unit_cell = traitlets.List(default_value=[]).tag(sync=True)
     selected_atom_index = traitlets.Int(-1).tag(sync=True)
     background_color = traitlets.Unicode('#ffffff').tag(sync=True)
     style = traitlets.Unicode('vdw').tag(sync=True) # options: 'vdw', 'ball-and-stick', 'wireframe'
     show_axes = traitlets.Bool(False).tag(sync=True)
 
-def view_molecule(atoms, bonds=None, style="vdw", background_color="white", show_axes=False):
+def view_molecule(atoms, bonds=None, unit_cell=None, style="vdw", background_color="white", show_axes=False):
     """
     Visualize a list of atoms using WebGL (Three.js).
     atoms format: [{"position": [x, y, z], "color": [r, g, b], "radius": r}, ...]
     bonds format: [{"source": i, "target": j}, ...]
+    unit_cell format: [[v1x, v1y, v1z], [v2x, v2y, v2z], [v3x, v3y, v3z]]
     style options: 'vdw' (default), 'ball-and-stick', 'wireframe'
     show_axes: bool, whether to display XYZ axes in the corner
     """
@@ -348,6 +435,7 @@ def view_molecule(atoms, bonds=None, style="vdw", background_color="white", show
     widget = MoleculeViewerWidget(
         atoms=atoms,
         bonds=bonds or [],
+        unit_cell=unit_cell or [],
         style=style,
         background_color=resolved_bg,
         show_axes=show_axes
