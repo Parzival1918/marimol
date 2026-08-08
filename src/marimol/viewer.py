@@ -57,7 +57,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             createAxis(0x4444ff, new THREE.Euler(Math.PI/2, 0, 0));  // Z (Blue)
             
             // Canvas sprites for Labels
-            const createLabel = (text, color, pos) => {
+            // Canvas sprites for Labels
+            const createLabel = (text, color, pos, depthTest = true) => {
                 const canvas = document.createElement('canvas');
                 canvas.width = 128; canvas.height = 128;
                 const ctx = canvas.getContext('2d');
@@ -68,17 +69,21 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 ctx.fillText(text, 64, 64);
                 
                 const texture = new THREE.CanvasTexture(canvas);
-                const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+                const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: depthTest });
                 const sprite = new THREE.Sprite(spriteMat);
                 sprite.position.copy(pos);
-                sprite.scale.set(1.2, 1.2, 1.2);
                 sprite.name = text; // Give a name for raycasting identification
-                axesScene.add(sprite);
+                return sprite;
             };
             
-            createLabel('X', '#ff4444', new THREE.Vector3(1.8, 0, 0));
-            createLabel('Y', '#44ff44', new THREE.Vector3(0, 1.8, 0));
-            createLabel('Z', '#4444ff', new THREE.Vector3(0, 0, 1.8));
+            const xLbl = createLabel('X', '#ff4444', new THREE.Vector3(1.8, 0, 0), false);
+            xLbl.scale.set(1.2, 1.2, 1.2); axesScene.add(xLbl);
+            
+            const yLbl = createLabel('Y', '#44ff44', new THREE.Vector3(0, 1.8, 0), false);
+            yLbl.scale.set(1.2, 1.2, 1.2); axesScene.add(yLbl);
+            
+            const zLbl = createLabel('Z', '#4444ff', new THREE.Vector3(0, 0, 1.8), false);
+            zLbl.scale.set(1.2, 1.2, 1.2); axesScene.add(zLbl);
             // Orthographic bounds: left, right, top, bottom, near, far
             const axesCamera = new THREE.OrthographicCamera(-2.5, 2.5, 2.5, -2.5, 0.1, 10);
 
@@ -103,8 +108,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             
             let atomMesh = null; // InstancedMesh for atoms
             let bondMesh = null; // InstancedMesh for bonds
-            let cellMesh = null; // LineSegments for unit cell
-            
+            let cellGroup = null; // Group containing cell lines and labels
             const dummy = new THREE.Object3D();
             const colorObj = new THREE.Color();
             const raycaster = new THREE.Raycaster();
@@ -121,7 +125,17 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 // Clear old meshes
                 if (atomMesh) { scene.remove(atomMesh); atomMesh.dispose(); atomMesh = null; }
                 if (bondMesh) { scene.remove(bondMesh); bondMesh.dispose(); bondMesh = null; }
-                if (cellMesh) { scene.remove(cellMesh); cellMesh.geometry.dispose(); cellMesh.material.dispose(); cellMesh = null; }
+                if (cellGroup) { 
+                    scene.remove(cellGroup); 
+                    cellGroup.traverse((child) => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) {
+                            if (child.material.map) child.material.map.dispose();
+                            child.material.dispose();
+                        }
+                    });
+                    cellGroup = null; 
+                }
 
                 // Auto-compute bonds if not provided and style needs them
                 if (bonds.length === 0 && (style === 'ball-and-stick' || style === 'wireframe')) {
@@ -245,18 +259,39 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     const v2 = new THREE.Vector3().fromArray(unitCell[1]);
                     const v3 = new THREE.Vector3().fromArray(unitCell[2]);
                     
-                    const vertices = [];
-                    const addEdge = (p1, p2) => {
-                        vertices.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
-                    };
-                    
                     const origin = new THREE.Vector3(0,0,0);
                     const p12 = v1.clone().add(v2);
                     const p13 = v1.clone().add(v3);
                     const p23 = v2.clone().add(v3);
                     const p123 = v1.clone().add(v2).add(v3);
+
+                    cellGroup = new THREE.Group();
                     
-                    addEdge(origin, v1); addEdge(origin, v2); addEdge(origin, v3);
+                    // Helper to create thick cylinders for main vectors
+                    const createThickVector = (v, colorHex) => {
+                        const len = v.length();
+                        const mat = new THREE.MeshPhongMaterial({ color: colorHex, shininess: 60 });
+                        const geo = new THREE.CylinderGeometry(0.04, 0.04, len, 8);
+                        geo.translate(0, len / 2, 0);
+                        const mesh = new THREE.Mesh(geo, mat);
+                        
+                        const q = new THREE.Quaternion();
+                        q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v.clone().normalize());
+                        mesh.setRotationFromQuaternion(q);
+                        return mesh;
+                    };
+                    
+                    // a, b, c vectors as thick shaded cylinders
+                    cellGroup.add(createThickVector(v1, 0xff4444));
+                    cellGroup.add(createThickVector(v2, 0x44ff44));
+                    cellGroup.add(createThickVector(v3, 0x4444ff));
+                    
+                    const vertices = [];
+                    const addEdge = (p1, p2) => {
+                        vertices.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
+                    };
+                    
+                    // Remaining unit cell edges as thin wireframes
                     addEdge(v1, p12); addEdge(v1, p13);
                     addEdge(v2, p12); addEdge(v2, p23);
                     addEdge(v3, p13); addEdge(v3, p23);
@@ -265,13 +300,24 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     const geo = new THREE.BufferGeometry();
                     geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
                     const mat = new THREE.LineBasicMaterial({ color: 0x888888 });
-                    cellMesh = new THREE.LineSegments(geo, mat);
-                    scene.add(cellMesh);
+                    const cellLines = new THREE.LineSegments(geo, mat);
+                    cellGroup.add(cellLines);
+                    
+                    const aLbl = createLabel('a', '#ff4444', v1.clone().add(v1.clone().normalize().multiplyScalar(0.2)));
+                    aLbl.scale.set(0.4, 0.4, 0.4); cellGroup.add(aLbl);
+                    
+                    const bLbl = createLabel('b', '#44ff44', v2.clone().add(v2.clone().normalize().multiplyScalar(0.2)));
+                    bLbl.scale.set(0.4, 0.4, 0.4); cellGroup.add(bLbl);
+                    
+                    const cLbl = createLabel('c', '#4444ff', v3.clone().add(v3.clone().normalize().multiplyScalar(0.2)));
+                    cLbl.scale.set(0.4, 0.4, 0.4); cellGroup.add(cLbl);
+                    
+                    scene.add(cellGroup);
                     
                     cellCenter = p123.clone().multiplyScalar(0.5);
                 }
 
-                if (numAtoms === 0 && !cellMesh) return;
+                if (numAtoms === 0 && !cellGroup) return;
 
                 // Auto-center and fit camera
                 const sceneCenter = new THREE.Vector3();
