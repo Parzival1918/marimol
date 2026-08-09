@@ -12,12 +12,27 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
         render({ model, el }) {
             // Container setup
             const container = document.createElement('div');
-            container.style.width = '100%';
-            container.style.height = '400px';
+            container.style.width = model.get('width') || '100%';
+            container.style.height = model.get('height') || '400px';
             container.style.display = 'block';
             container.style.position = 'relative';
             container.style.backgroundColor = model.get('background_color') || '#ffffff';
             container.style.overflow = 'hidden';
+            
+            const applyOutline = () => {
+                const outl = model.get('outline');
+                if (outl === true) {
+                    container.style.border = '1px solid #ccc';
+                    container.style.borderRadius = '4px';
+                } else if (typeof outl === 'string' && outl.length > 0) {
+                    container.style.border = outl;
+                    container.style.borderRadius = '4px';
+                } else {
+                    container.style.border = 'none';
+                    container.style.borderRadius = '0px';
+                }
+            };
+            applyOutline();
             el.appendChild(container);
 
             // Three.js setup
@@ -553,6 +568,13 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             // Watch for changes from Python
             model.on("change:data", () => updateScene(true));
             model.on("change:style", () => updateScene(false));
+            model.on("change:width", () => {
+                container.style.width = model.get('width') || '100%';
+            });
+            model.on("change:height", () => {
+                container.style.height = model.get('height') || '400px';
+            });
+            model.on("change:outline", applyOutline);
             model.on("change:background_color", () => {
                 container.style.backgroundColor = model.get('background_color');
             });
@@ -739,8 +761,11 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     style = traitlets.Dict().tag(sync=True)
     show_axes = traitlets.Bool(False).tag(sync=True)
     projection = traitlets.Unicode('orthographic').tag(sync=True) # 'perspective' or 'orthographic'
+    width = traitlets.Unicode('100%').tag(sync=True)
+    height = traitlets.Unicode('400px').tag(sync=True)
+    outline = traitlets.Any(default_value=False).tag(sync=True) # bool or str
 
-def view_molecule(data, style="vdw", background_color="white", show_axes=False, projection="orthographic"):
+def view_molecule(data, style="vdw", background_color="white", show_axes=False, projection="orthographic", width="100%", height="400px", outline=False):
     """
     Visualize a crystal or molecule using WebGL (Three.js).
     data format: a dictionary with keys: 'positions', 'species', 'bonds' (optional), 'unit_cell' (optional)
@@ -787,7 +812,10 @@ def view_molecule(data, style="vdw", background_color="white", show_axes=False, 
         style=resolved_style,
         background_color=resolved_bg,
         show_axes=show_axes,
-        projection=projection
+        projection=projection,
+        width=width,
+        height=height,
+        outline=outline
     )
         
     return mo.ui.anywidget(widget)

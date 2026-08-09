@@ -31,6 +31,13 @@ def _():
 
 
 @app.cell
+def _(viewer):
+    viewer.height = "400px"
+    viewer.outline = True
+    return
+
+
+@app.cell
 def _(mo, text, viewer):
     mo.vstack([viewer, text])
     return
