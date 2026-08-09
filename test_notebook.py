@@ -28,7 +28,7 @@ def _():
         }
         frames_atoms.append(atoms)
 
-    viewer = view_molecule(frames_atoms, style="wireframe", draw_labels=True, show_axes=True, projection="orthographic", fog=True, fog_strength=0.5, draw_outlines=True)
+    viewer = view_molecule(frames_atoms, draw_labels=True, show_axes=True, projection="orthographic", fog=True, fog_strength=0.5, draw_outlines=True, measuring_tool=True)
     return mo, viewer
 
 

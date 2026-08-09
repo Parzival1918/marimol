@@ -254,6 +254,180 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             // Prevent clicks on UI panels from bubbling up and clearing the selection
             uiContainer.addEventListener('click', (e) => e.stopPropagation());
             infoPanel.addEventListener('click', (e) => e.stopPropagation());
+
+            // --- Measuring Tool UI ---
+            let isMeasuring = false;
+            let measureSelection = []; // array of {index, pos: THREE.Vector3}
+            let measureLineMesh = null;
+            let measureSpheres = [];
+
+            const measureContainer = document.createElement('div');
+            measureContainer.style.position = 'absolute';
+            measureContainer.style.top = '15px';
+            measureContainer.style.right = '15px';
+            measureContainer.style.zIndex = '10';
+            measureContainer.style.display = 'flex';
+            measureContainer.style.flexDirection = 'column';
+            measureContainer.style.alignItems = 'flex-end';
+            
+            const rulerSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6" y2="10"></line><line x1="10" y1="6" x2="10" y2="10"></line><line x1="14" y1="6" x2="14" y2="10"></line><line x1="18" y1="6" x2="18" y2="10"></line></svg>`;
+            const measureBtn = document.createElement('button');
+            measureBtn.innerHTML = rulerSvg;
+            measureBtn.style.color = '#333';
+            measureBtn.style.background = 'rgba(255, 255, 255, 0.7)';
+            measureBtn.style.border = 'none';
+            measureBtn.style.backdropFilter = 'blur(10px)';
+            measureBtn.style.WebkitBackdropFilter = 'blur(10px)';
+            measureBtn.style.borderRadius = '8px';
+            measureBtn.style.padding = '8px';
+            measureBtn.style.cursor = 'pointer';
+            measureBtn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+            measureBtn.style.transition = 'background 0.2s, transform 0.1s';
+            measureBtn.title = 'Measure Tool (Distance, Angle, Dihedral)';
+            measureBtn.onmouseover = () => { if (!isMeasuring) { measureBtn.style.background = 'rgba(255,255,255,0.9)'; measureBtn.style.transform = 'scale(1.1)'; } };
+            measureBtn.onmouseout = () => { if (!isMeasuring) { measureBtn.style.background = 'rgba(255,255,255,0.7)'; measureBtn.style.transform = 'scale(1)'; } };
+
+            const measureLabel = document.createElement('div');
+            measureLabel.style.marginTop = '8px';
+            measureLabel.style.padding = '8px 12px';
+            measureLabel.style.background = 'rgba(255, 255, 255, 0.7)';
+            measureLabel.style.backdropFilter = 'blur(10px)';
+            measureLabel.style.WebkitBackdropFilter = 'blur(10px)';
+            measureLabel.style.borderRadius = '8px';
+            measureLabel.style.fontFamily = 'monospace';
+            measureLabel.style.fontSize = '14px';
+            measureLabel.style.fontWeight = 'bold';
+            measureLabel.style.color = '#e91e63';
+            measureLabel.style.display = 'none';
+            measureLabel.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+
+            measureContainer.appendChild(measureBtn);
+            measureContainer.appendChild(measureLabel);
+            container.appendChild(measureContainer);
+            measureContainer.addEventListener('click', (e) => e.stopPropagation());
+
+            // Listen to traitlet
+            measureContainer.style.display = model.get('measuring_tool') ? 'flex' : 'none';
+            model.on('change:measuring_tool', () => {
+                const show = model.get('measuring_tool');
+                measureContainer.style.display = show ? 'flex' : 'none';
+                if (!show && isMeasuring) {
+                    measureBtn.click(); // toggle off
+                }
+            });
+
+            function clearMeasurement() {
+                measureSelection = [];
+                if (measureLineMesh) {
+                    scene.remove(measureLineMesh);
+                    measureLineMesh.geometry.dispose();
+                    measureLineMesh.material.dispose();
+                    measureLineMesh = null;
+                }
+                measureSpheres.forEach(mesh => {
+                    scene.remove(mesh);
+                    mesh.geometry.dispose();
+                    mesh.material.dispose();
+                });
+                measureSpheres = [];
+                measureLabel.style.display = 'none';
+                measureLabel.innerText = '';
+            }
+
+            function updateMeasurementUI() {
+                if (measureLineMesh) {
+                    scene.remove(measureLineMesh);
+                    measureLineMesh.geometry.dispose();
+                    measureLineMesh.material.dispose();
+                    measureLineMesh = null;
+                }
+                measureSpheres.forEach(mesh => {
+                    scene.remove(mesh);
+                    mesh.geometry.dispose();
+                    mesh.material.dispose();
+                });
+                measureSpheres = [];
+                
+                if (measureSelection.length === 0) {
+                    if (isMeasuring) {
+                        measureLabel.style.display = 'block';
+                        measureLabel.innerText = 'Select atom 1...';
+                    } else {
+                        measureLabel.style.display = 'none';
+                    }
+                    return;
+                }
+
+                // Draw spheres for selected points
+                const sphereMat = new THREE.MeshBasicMaterial({ color: 0xe91e63, depthTest: false });
+                const sphereGeo = new THREE.SphereGeometry(0.15, 16, 16);
+                measureSelection.forEach(s => {
+                    const m = new THREE.Mesh(sphereGeo, sphereMat);
+                    m.position.copy(s.pos);
+                    m.renderOrder = 999;
+                    scene.add(m);
+                    measureSpheres.push(m);
+                });
+
+                // Draw lines between selected points
+                if (measureSelection.length > 1) {
+                    const lineMat = new THREE.LineBasicMaterial({ color: 0xe91e63, linewidth: 2, depthTest: false });
+                    const points = measureSelection.map(s => s.pos);
+                    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+                    measureLineMesh = new THREE.Line(lineGeo, lineMat);
+                    measureLineMesh.renderOrder = 999;
+                    scene.add(measureLineMesh);
+                }
+                
+                if (measureSelection.length < 2) {
+                    measureLabel.style.display = 'block';
+                    measureLabel.innerText = 'Select atom 2...';
+                    return;
+                }
+                
+                if (measureSelection.length === 2) {
+                    const d = measureSelection[0].pos.distanceTo(measureSelection[1].pos);
+                    measureLabel.innerText = `Dist: ${d.toFixed(3)} Å`;
+                } else if (measureSelection.length === 3) {
+                    const p1 = measureSelection[0].pos;
+                    const p2 = measureSelection[1].pos;
+                    const p3 = measureSelection[2].pos;
+                    const v1 = new THREE.Vector3().subVectors(p1, p2).normalize();
+                    const v2 = new THREE.Vector3().subVectors(p3, p2).normalize();
+                    const angle = v1.angleTo(v2) * 180 / Math.PI;
+                    measureLabel.innerText = `Angle: ${angle.toFixed(1)}°`;
+                } else if (measureSelection.length === 4) {
+                    const p1 = measureSelection[0].pos;
+                    const p2 = measureSelection[1].pos;
+                    const p3 = measureSelection[2].pos;
+                    const p4 = measureSelection[3].pos;
+                    const b1 = new THREE.Vector3().subVectors(p2, p1);
+                    const b2 = new THREE.Vector3().subVectors(p3, p2);
+                    const b3 = new THREE.Vector3().subVectors(p4, p3);
+                    const n1 = new THREE.Vector3().crossVectors(b1, b2).normalize();
+                    const n2 = new THREE.Vector3().crossVectors(b2, b3).normalize();
+                    const m = b2.clone().normalize();
+                    const x = n1.dot(n2);
+                    const y = new THREE.Vector3().crossVectors(n1, m).dot(n2);
+                    const dihedral = Math.atan2(y, x) * 180 / Math.PI;
+                    measureLabel.innerText = `Dihedral: ${dihedral.toFixed(1)}°`;
+                }
+            }
+
+            measureBtn.addEventListener('click', () => {
+                isMeasuring = !isMeasuring;
+                if (isMeasuring) {
+                    measureBtn.style.background = '#e91e63';
+                    measureBtn.style.color = 'white';
+                    measureBtn.style.transform = 'scale(1.1)';
+                    updateMeasurementUI();
+                } else {
+                    measureBtn.style.background = 'rgba(255, 255, 255, 0.7)';
+                    measureBtn.style.color = '#333';
+                    measureBtn.style.transform = 'scale(1)';
+                    clearMeasurement();
+                }
+            });
             
             function updateInfoPanel() {
                 const idx = model.get('selected_atom_index');
@@ -368,6 +542,11 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (bondMesh) { scene.remove(bondMesh); bondMesh.dispose(); bondMesh = null; }
                 if (atomOutlineMesh) { scene.remove(atomOutlineMesh); atomOutlineMesh.dispose(); atomOutlineMesh = null; }
                 if (bondOutlineMesh) { scene.remove(bondOutlineMesh); bondOutlineMesh.dispose(); bondOutlineMesh = null; }
+                clearMeasurement();
+                if (isMeasuring) {
+                    measureLabel.style.display = 'block';
+                    measureLabel.innerText = 'Select atom 1...';
+                }
                 if (cellGroup) { 
                     scene.remove(cellGroup); 
                     cellGroup.traverse((child) => {
@@ -829,11 +1008,28 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     if (intersects.length > 0) {
                         // The instanceId tells us which atom was clicked
                         const instanceId = intersects[0].instanceId;
-                        model.set("selected_atom_index", instanceId);
-                        model.save_changes();
+                        if (isMeasuring) {
+                            if (measureSelection.length >= 4) {
+                                measureSelection = [];
+                            }
+                            const dummyMat = new THREE.Matrix4();
+                            atomMesh.getMatrixAt(instanceId, dummyMat);
+                            const pos = new THREE.Vector3();
+                            pos.setFromMatrixPosition(dummyMat);
+                            measureSelection.push({ index: instanceId, pos: pos });
+                            updateMeasurementUI();
+                        } else {
+                            model.set("selected_atom_index", instanceId);
+                            model.save_changes();
+                        }
                     } else {
-                        model.set("selected_atom_index", -1);
-                        model.save_changes();
+                        if (isMeasuring) {
+                            measureSelection = [];
+                            updateMeasurementUI();
+                        } else {
+                            model.set("selected_atom_index", -1);
+                            model.save_changes();
+                        }
                     }
                 }
             });
@@ -936,8 +1132,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     fog_strength = traitlets.Float(0.5).tag(sync=True)
     draw_outlines = traitlets.Bool(False).tag(sync=True)
     draw_labels = traitlets.Bool(False).tag(sync=True)
+    measuring_tool = traitlets.Bool(False).tag(sync=True)
 
-def view_molecule(data, style="ball-and-stick", background_color="white", show_axes=False, projection="orthographic", width="100%", height="400px", outline=False, fog=False, fog_strength=0.5, draw_outlines=False, draw_labels=False):
+def view_molecule(data, style="ball-and-stick", background_color="white", show_axes=False, projection="orthographic", width="100%", height="400px", outline=False, fog=False, fog_strength=0.5, draw_outlines=False, draw_labels=False, measuring_tool=False):
     """
     Visualize a crystal or molecule using WebGL (Three.js).
     data format: a dictionary with keys: 'positions', 'species', 'bonds' (optional), 'unit_cell' (optional)
@@ -998,7 +1195,8 @@ def view_molecule(data, style="ball-and-stick", background_color="white", show_a
         fog=fog,
         fog_strength=fog_strength,
         draw_outlines=draw_outlines,
-        draw_labels=draw_labels
+        draw_labels=draw_labels,
+        measuring_tool=measuring_tool
     )
         
     return mo.ui.anywidget(widget)
