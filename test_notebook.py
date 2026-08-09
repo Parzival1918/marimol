@@ -23,11 +23,12 @@ def _():
                 [0.0, 2.0, 0.0],
                 [0.0, 0.0, 2.0]
             ],
-            "labels": ["A", "B", "C"]
+            "labels": ["A", "B", "C"],
+            "highlight": [1]
         }
         frames_atoms.append(atoms)
 
-    viewer = view_molecule(frames_atoms, draw_labels=True, show_axes=True, projection="orthographic", fog=True, fog_strength=0.5, draw_outlines=True)
+    viewer = view_molecule(frames_atoms, style="wireframe", draw_labels=True, show_axes=True, projection="orthographic", fog=True, fog_strength=0.5, draw_outlines=True)
     return mo, viewer
 
 

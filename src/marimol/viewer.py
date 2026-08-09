@@ -316,7 +316,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const frames = model.get('data') || [];
                 const isTrajectory = frames.length > 1;
                 
-                let positions = [], species = [], bonds = [], unitCell = [], customLabels = [];
+                let positions = [], species = [], bonds = [], unitCell = [], customLabels = [], customHighlight = [];
                 if (isTrajectory) {
                     uiContainer.style.display = 'flex';
                     const cFrame = model.get('current_frame');
@@ -328,6 +328,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     bonds = fData.bonds || [];
                     unitCell = fData.unit_cell || [];
                     customLabels = fData.labels || [];
+                    customHighlight = fData.highlight || [];
                 } else {
                     uiContainer.style.display = 'none';
                     const fData = frames[0] || {};
@@ -336,6 +337,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     bonds = fData.bonds || [];
                     unitCell = fData.unit_cell || [];
                     customLabels = fData.labels || [];
+                    customHighlight = fData.highlight || [];
                 }
 
                 const style = model.get('style') || {};
@@ -343,6 +345,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const atomicRadiusScaler = style.atomic_radius_scaler !== undefined ? style.atomic_radius_scaler : 1.0;
                 const fixedAtomicRadius = style.fixed_atomic_radius !== undefined ? style.fixed_atomic_radius : null;
                 const hydrogenAtomRadius = style.hydrogen_atom_radius !== undefined ? style.hydrogen_atom_radius : null;
+                const isWireframe = (bondRadius === 0.05 && fixedAtomicRadius === 0.05);
                 const numAtoms = positions.length;
                 
                 const colorMap = model.get('color_map') || {};
@@ -467,7 +470,11 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         atomOutlineMesh.setMatrixAt(i, dummy.matrix);
                     }
 
-                    colorObj.setRGB(col[0], col[1], col[2]);
+                    if (customHighlight && customHighlight.includes(i)) {
+                        colorObj.setRGB(0, 1, 1);
+                    } else {
+                        colorObj.setRGB(col[0], col[1], col[2]);
+                    }
                     atomMesh.setColorAt(i, colorObj);
                     
                     centerSum.add(dummy.position);
@@ -481,10 +488,13 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     scene.add(atomOutlineMesh);
                 }
 
+
                 // --- BONDS ---
                 if (showBonds && bonds.length > 0) {
                     bondMesh = new THREE.InstancedMesh(cylinderGeometry, cylinderMaterial, bonds.length * 2);
                     if (drawOutlines) bondOutlineMesh = new THREE.InstancedMesh(cylinderGeometry, outlineMaterial, bonds.length);
+                    
+
                     const vA = new THREE.Vector3();
                     const vB = new THREE.Vector3();
                     const vDir = new THREE.Vector3();
@@ -507,8 +517,12 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         dummy.updateMatrix();
                         bondMesh.setMatrixAt(i * 2, dummy.matrix);
                         
-                        const colA = getColor(species[b.source]);
-                        colorObj.setRGB(colA[0], colA[1], colA[2]);
+                        if (customHighlight && customHighlight.includes(b.source)) {
+                            colorObj.setRGB(0, 1, 1);
+                        } else {
+                            const colA = getColor(species[b.source]);
+                            colorObj.setRGB(colA[0], colA[1], colA[2]);
+                        }
                         bondMesh.setColorAt(i * 2, colorObj);
                         
                         // Second half (Midpoint to Atom B)
@@ -518,8 +532,12 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         dummy.updateMatrix();
                         bondMesh.setMatrixAt(i * 2 + 1, dummy.matrix);
                         
-                        const colB = getColor(species[b.target]);
-                        colorObj.setRGB(colB[0], colB[1], colB[2]);
+                        if (customHighlight && customHighlight.includes(b.target)) {
+                            colorObj.setRGB(0, 1, 1);
+                        } else {
+                            const colB = getColor(species[b.target]);
+                            colorObj.setRGB(colB[0], colB[1], colB[2]);
+                        }
                         bondMesh.setColorAt(i * 2 + 1, colorObj);
 
                         // Single full-length outline cylinder
