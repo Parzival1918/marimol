@@ -15,21 +15,18 @@ def _():
     frames_atoms = []
     for f in range(30):
         offset = math.sin(f / 30.0 * 2 * math.pi) * 0.5
-        atoms = [
-            {"position": [0.0, offset, 0.0], "color": get_color("O"), "radius": get_radius("O"), "species": 8},
-            {"position": [0.75, 0.58 + offset, 0.0], "color": get_color("H"), "radius": get_radius("H"), "species": 1},
-            {"position": [-0.75, 0.58 + offset, 0.0], "color": get_color("H"), "radius": get_radius("H"), "species": 1},
-        ]
+        atoms = {
+            "positions": [[0.0, offset, 0.0], [0.75, 0.58 + offset, 0.0], [-0.75, 0.58 + offset, 0.0]],
+            "species": ["O", "H", "H"],
+            "unit_cell": [
+                [2.0, 0.0, 0.0],
+                [0.0, 2.0, 0.0],
+                [0.0, 0.0, 2.0]
+            ]
+        }
         frames_atoms.append(atoms)
 
-    # Example 3x3 unit cell matrix (simple cubic, side length 2.0 A)
-    unit_cell = [
-        [2.0, 0.0, 0.0],
-        [0.0, 2.0, 0.0],
-        [0.0, 0.0, 2.0]
-    ]
-
-    viewer = view_molecule(frames_atoms, unit_cell=unit_cell, style="ball-and-stick", show_axes=True, projection="orthographic")
+    viewer = view_molecule(frames_atoms, style="ball-and-stick", show_axes=True, projection="orthographic")
     return mo, viewer
 
 
@@ -45,8 +42,43 @@ def _(mo, viewer):
     if viewer.selected_atom_index == -1:
         text = mo.md("### No atom selected. Click an atom to select it.")
     else:
-        text = mo.md(f"### Selected Atom Index: **{viewer.selected_atom_index}**")
+        text = mo.md(f"### Selected Atom Index: **{viewer.selected_atom_index}** in frame {viewer.current_frame}")
     return (text,)
+
+
+@app.cell
+def _():
+    from ase.build import molecule
+    from marimol.external import view_ase
+
+    mol = molecule("CH4", vacuum=4)
+    view_ase(mol, style="wireframe", projection="orthographic")
+    return mol, view_ase
+
+
+@app.cell
+def _(view_ase):
+    from ase.build import bulk
+
+    crys = bulk('Cu', 'hcp', a=3.6)
+    view_ase(crys, style="ball-and-stick", projection="orthographic")
+    return (crys,)
+
+
+@app.cell
+def _(view_ase):
+    from ase.build import nanotube
+
+    tube = nanotube(6, 0, length=4)
+    print(tube)
+    view_ase(tube, style="ball-and-stick", projection="orthographic")
+    return (tube,)
+
+
+@app.cell
+def _(crys, mol, tube, view_ase):
+    view_ase([mol, crys, tube], style="ball-and-stick", projection="orthographic")
+    return
 
 
 if __name__ == "__main__":

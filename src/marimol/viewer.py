@@ -1,7 +1,7 @@
 import anywidget
 import traitlets
 import marimo as mo
-from .color_utils import resolve_color
+from .utils import resolve_color
 
 class MoleculeViewerWidget(anywidget.AnyWidget):
     _esm = """
@@ -171,7 +171,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             const btnPlay = createBtn(iconPlay, () => togglePlay());
             const btnNext = createBtn(iconNext, () => setFrame(model.get('current_frame') + 1));
             const btnLast = createBtn(iconLast, () => {
-                const frames = model.get('frames');
+                const frames = model.get('data');
                 if (frames && frames.length > 0) setFrame(frames.length - 1);
             });
             const frameCounter = document.createElement('span');
@@ -219,22 +219,21 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     return;
                 }
                 const cFrame = model.get('current_frame');
-                const frames = model.get('frames') || [];
-                let atoms = [];
+                const frames = model.get('data') || [];
+                let positions = [];
+                let species_list = [];
                 if (frames.length > 0 && frames[cFrame]) {
-                    atoms = frames[cFrame].atoms || [];
-                } else {
-                    atoms = model.get('atoms') || [];
+                    positions = frames[cFrame].positions || [];
+                    species_list = frames[cFrame].species || [];
                 }
                 
-                if (idx >= atoms.length) {
+                if (idx >= positions.length) {
                     infoPanel.style.display = 'none';
                     return;
                 }
                 
-                const atom = atoms[idx];
-                const pos = atom.position || [0, 0, 0];
-                const species = atom.species !== undefined ? atom.species : '?';
+                const pos = positions[idx] || [0, 0, 0];
+                const species = species_list[idx] !== undefined ? species_list[idx] : '?';
                 
                 infoPanel.innerText = `Index:   ${idx}\nSpecies: ${species}\nPos:     [${pos[0].toFixed(3)}, ${pos[1].toFixed(3)}, ${pos[2].toFixed(3)}]`;
                 infoPanel.style.display = 'block';
@@ -247,7 +246,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 btnPlay.innerHTML = isPlaying ? iconPause : iconPlay;
                 if (isPlaying) {
                     animationInterval = setInterval(() => {
-                        const frames = model.get('frames') || [];
+                        const frames = model.get('data') || [];
                         if (frames.length === 0) return;
                         let next = model.get('current_frame') + 1;
                         if (next >= frames.length) next = 0; // loop
@@ -259,7 +258,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             }
 
             function setFrame(idx) {
-                const frames = model.get('frames') || [];
+                const frames = model.get('data') || [];
                 if (!frames || frames.length === 0) return;
                 if (idx < 0) idx = frames.length - 1;
                 if (idx >= frames.length) idx = 0;
@@ -271,24 +270,27 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             let isCameraInitialized = false;
 
             function updateScene(forceFitCamera = false) {
-                const frames = model.get('frames') || [];
-                const isTrajectory = frames.length > 0;
+                const frames = model.get('data') || [];
+                const isTrajectory = frames.length > 1;
                 
-                let atoms, bonds, unitCell;
+                let positions = [], species = [], bonds = [], unitCell = [];
                 if (isTrajectory) {
                     uiContainer.style.display = 'flex';
                     const cFrame = model.get('current_frame');
                     frameCounter.innerText = `${cFrame + 1} / ${frames.length}`;
                     
                     const fData = frames[cFrame] || {};
-                    atoms = fData.atoms || [];
+                    positions = fData.positions || [];
+                    species = fData.species || [];
                     bonds = fData.bonds || [];
                     unitCell = fData.unit_cell || [];
                 } else {
                     uiContainer.style.display = 'none';
-                    atoms = model.get('atoms') || [];
-                    bonds = model.get('bonds') || [];
-                    unitCell = model.get('unit_cell') || [];
+                    const fData = frames[0] || {};
+                    positions = fData.positions || [];
+                    species = fData.species || [];
+                    bonds = fData.bonds || [];
+                    unitCell = fData.unit_cell || [];
                 }
 
                 const style = model.get('style') || {};
@@ -296,8 +298,23 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const atomicRadiusScaler = style.atomic_radius_scaler !== undefined ? style.atomic_radius_scaler : 1.0;
                 const fixedAtomicRadius = style.fixed_atomic_radius !== undefined ? style.fixed_atomic_radius : null;
                 const hydrogenAtomRadius = style.hydrogen_atom_radius !== undefined ? style.hydrogen_atom_radius : null;
-                const numAtoms = atoms.length;
+                const numAtoms = positions.length;
                 
+                const colorMap = model.get('color_map') || {};
+                const radiusMap = model.get('radius_map') || {};
+                const defaultColor = model.get('default_color') || [1, 0.08, 0.58];
+                const defaultRadius = model.get('default_radius') || 0.8;
+                
+                const capitalize = (s) => (typeof s === 'string' && s.length > 0) ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : String(s);
+                const getColor = (sp) => {
+                    const c = colorMap[capitalize(sp)];
+                    return c !== undefined ? c : defaultColor;
+                };
+                const getRadius = (sp) => {
+                    const r = radiusMap[capitalize(sp)];
+                    return r !== undefined ? r : defaultRadius;
+                };
+
                 // Clear old meshes
                 if (atomMesh) { scene.remove(atomMesh); atomMesh.dispose(); atomMesh = null; }
                 if (bondMesh) { scene.remove(bondMesh); bondMesh.dispose(); bondMesh = null; }
@@ -318,13 +335,16 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     bonds = [];
                     for(let i=0; i<numAtoms; i++) {
                         for(let j=i+1; j<numAtoms; j++) {
-                            const a = atoms[i], b = atoms[j];
-                            const dx = a.position[0] - b.position[0];
-                            const dy = a.position[1] - b.position[1];
-                            const dz = a.position[2] - b.position[2];
+                            const pA = positions[i];
+                            const pB = positions[j];
+                            const rA = getRadius(species[i]);
+                            const rB = getRadius(species[j]);
+                            const dx = pA[0] - pB[0];
+                            const dy = pA[1] - pB[1];
+                            const dz = pA[2] - pB[2];
                             const dist = Math.hypot(dx, dy, dz);
                             // 1.3 is a standard tolerance for covalent radii bonding
-                            if (dist > 0.1 && dist < (a.radius + b.radius) * 1.3) {
+                            if (dist > 0.1 && dist < (rA + rB) * 1.3) {
                                 bonds.push({source: i, target: j});
                             }
                         }
@@ -339,12 +359,12 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 let centerSum = new THREE.Vector3(0, 0, 0);
 
                 for (let i = 0; i < numAtoms; i++) {
-                    const a = atoms[i];
-                    const pos = a.position || [0, 0, 0];
-                    const col = a.color || [1, 1, 1];
-                    let rad = a.radius || 1.0;
+                    const pos = positions[i] || [0, 0, 0];
+                    const sp = species[i] !== undefined ? species[i] : '?';
+                    const col = getColor(sp);
+                    let rad = getRadius(sp);
                     
-                    if (a.species === 1 && hydrogenAtomRadius != null) {
+                    if ((sp === 1 || sp === 'H' || sp === 'h') && hydrogenAtomRadius != null) {
                         rad = hydrogenAtomRadius;
                     } else if (fixedAtomicRadius != null) {
                         rad = fixedAtomicRadius;
@@ -379,11 +399,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     
                     for (let i = 0; i < bonds.length; i++) {
                         const b = bonds[i];
-                        const atomA = atoms[b.source];
-                        const atomB = atoms[b.target];
                         
-                        vA.fromArray(atomA.position || [0,0,0]);
-                        vB.fromArray(atomB.position || [0,0,0]);
+                        vA.fromArray(positions[b.source] || [0,0,0]);
+                        vB.fromArray(positions[b.target] || [0,0,0]);
                         vMid.copy(vA).lerp(vB, 0.5);
                         
                         const distance = vA.distanceTo(vMid);
@@ -396,7 +414,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         dummy.updateMatrix();
                         bondMesh.setMatrixAt(i * 2, dummy.matrix);
                         
-                        const colA = atomA.color || [1,1,1];
+                        const colA = getColor(species[b.source]);
                         colorObj.setRGB(colA[0], colA[1], colA[2]);
                         bondMesh.setColorAt(i * 2, colorObj);
                         
@@ -407,7 +425,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         dummy.updateMatrix();
                         bondMesh.setMatrixAt(i * 2 + 1, dummy.matrix);
                         
-                        const colB = atomB.color || [1,1,1];
+                        const colB = getColor(species[b.target]);
                         colorObj.setRGB(colB[0], colB[1], colB[2]);
                         bondMesh.setColorAt(i * 2 + 1, colorObj);
                     }
@@ -484,14 +502,15 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (numAtoms === 0 && !cellGroup) return;
 
                 // Auto-center and fit camera
+                const sceneCenter = new THREE.Vector3();
+                if (cellCenter) {
+                    sceneCenter.copy(cellCenter);
+                } else if (numAtoms > 0) {
+                    centerSum.divideScalar(numAtoms);
+                    sceneCenter.copy(centerSum);
+                }
+
                 if (!isCameraInitialized || forceFitCamera === true) {
-                    const sceneCenter = new THREE.Vector3();
-                    if (cellCenter) {
-                        sceneCenter.copy(cellCenter);
-                    } else if (numAtoms > 0) {
-                        centerSum.divideScalar(numAtoms);
-                        sceneCenter.copy(centerSum);
-                    }
                     controls.target.copy(sceneCenter);
                     
                     let maxDist = 0;
@@ -500,7 +519,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         maxDist = cellCenter.length();
                     } else if (numAtoms > 0) {
                         for (let i = 0; i < numAtoms; i++) {
-                            const pos = new THREE.Vector3().fromArray(atoms[i].position);
+                            const pos = new THREE.Vector3().fromArray(positions[i] || [0,0,0]);
                             const dist = pos.distanceTo(sceneCenter);
                             if (dist > maxDist) maxDist = dist;
                         }
@@ -521,15 +540,19 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     camera.position.set(sceneCenter.x, sceneCenter.y, sceneCenter.z + cameraDist);
                     controls.update();
                     isCameraInitialized = true;
+                } else {
+                    const targetDelta = new THREE.Vector3().subVectors(sceneCenter, controls.target);
+                    if (targetDelta.lengthSq() > 0.0001) {
+                        controls.target.copy(sceneCenter);
+                        camera.position.add(targetDelta);
+                        controls.update();
+                    }
                 }
             }
 
             // Watch for changes from Python
-            model.on("change:atoms", () => updateScene(true));
-            model.on("change:frames", () => updateScene(true));
-            model.on("change:bonds", () => updateScene(true));
+            model.on("change:data", () => updateScene(true));
             model.on("change:style", () => updateScene(false));
-            model.on("change:unit_cell", () => updateScene(true));
             model.on("change:background_color", () => {
                 container.style.backgroundColor = model.get('background_color');
             });
@@ -704,26 +727,27 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
         }
     }
     """
-    atoms = traitlets.List().tag(sync=True)
-    bonds = traitlets.List(default_value=[]).tag(sync=True)
-    unit_cell = traitlets.List(default_value=[]).tag(sync=True)
-    frames = traitlets.List(default_value=[]).tag(sync=True)
+    data = traitlets.List(default_value=[]).tag(sync=True)
+    color_map = traitlets.Dict().tag(sync=True)
+    radius_map = traitlets.Dict().tag(sync=True)
+    default_color = traitlets.List().tag(sync=True)
+    default_radius = traitlets.Float().tag(sync=True)
+    
     current_frame = traitlets.Int(0).tag(sync=True)
     selected_atom_index = traitlets.Int(-1).tag(sync=True)
     background_color = traitlets.Unicode('#ffffff').tag(sync=True)
     style = traitlets.Dict().tag(sync=True)
     show_axes = traitlets.Bool(False).tag(sync=True)
-    projection = traitlets.Unicode('perspective').tag(sync=True) # 'perspective' or 'orthographic'
+    projection = traitlets.Unicode('orthographic').tag(sync=True) # 'perspective' or 'orthographic'
 
-def view_molecule(atoms, bonds=None, unit_cell=None, style="vdw", background_color="white", show_axes=False, projection="perspective"):
+def view_molecule(data, style="vdw", background_color="white", show_axes=False, projection="orthographic"):
     """
-    Visualize a list of atoms using WebGL (Three.js).
-    atoms format: [{"position": [x, y, z], "color": [r, g, b], "radius": r}, ...] OR a list of such lists for a trajectory.
-    bonds format: [{"source": i, "target": j}, ...] OR a list of such lists.
-    unit_cell format: [[v1x, v1y, v1z], [v2x, v2y, v2z], [v3x, v3y, v3z]] OR a list of such lists.
+    Visualize a crystal or molecule using WebGL (Three.js).
+    data format: a dictionary with keys: 'positions', 'species', 'bonds' (optional), 'unit_cell' (optional)
+                 OR a list of such dictionaries for a trajectory.
     style options: 'vdw' (default), 'ball-and-stick', 'wireframe', or a custom dictionary.
     show_axes: bool, whether to display XYZ axes in the corner
-    projection: 'perspective' (default) or 'orthographic'
+    projection: 'orthographic' (default) or 'perspective'
     """
     STYLES = {
         "vdw": {
@@ -749,41 +773,21 @@ def view_molecule(atoms, bonds=None, unit_cell=None, style="vdw", background_col
     resolved_style = STYLES.get(style, STYLES["vdw"]) if isinstance(style, str) else style
     resolved_bg = resolve_color(background_color)
     
-    is_trajectory = len(atoms) > 0 and isinstance(atoms[0], list)
+    is_trajectory = isinstance(data, list)
+    frames_data = data if is_trajectory else [data]
     
-    if is_trajectory:
-        frames_data = []
-        for i in range(len(atoms)):
-            # Handle variable bonds and unit cells across frames, or broadcast static ones
-            f_bonds = bonds[i] if bonds and len(bonds) > 0 and isinstance(bonds[0], list) and not isinstance(bonds[0][0], (int, float)) else (bonds or [])
-            f_cell = unit_cell[i] if unit_cell and len(unit_cell) > 0 and isinstance(unit_cell[0], list) and isinstance(unit_cell[0][0], list) else (unit_cell or [])
-            
-            frames_data.append({
-                "atoms": atoms[i],
-                "bonds": f_bonds,
-                "unit_cell": f_cell
-            })
-            
-        widget = MoleculeViewerWidget(
-            atoms=[],
-            bonds=[],
-            unit_cell=[],
-            frames=frames_data,
-            style=resolved_style,
-            background_color=resolved_bg,
-            show_axes=show_axes,
-            projection=projection
-        )
-    else:
-        widget = MoleculeViewerWidget(
-            atoms=atoms,
-            bonds=bonds or [],
-            unit_cell=unit_cell or [],
-            frames=[],
-            style=resolved_style,
-            background_color=resolved_bg,
-            show_axes=show_axes,
-            projection=projection
-        )
+    from .utils import CPK_COLORS, ATOMIC_RADII, DEFAULT_COLOR, DEFAULT_RADIUS
+    
+    widget = MoleculeViewerWidget(
+        data=frames_data,
+        color_map=CPK_COLORS,
+        radius_map=ATOMIC_RADII,
+        default_color=DEFAULT_COLOR,
+        default_radius=DEFAULT_RADIUS,
+        style=resolved_style,
+        background_color=resolved_bg,
+        show_axes=show_axes,
+        projection=projection
+    )
         
     return mo.ui.anywidget(widget)

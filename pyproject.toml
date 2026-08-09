@@ -13,6 +13,15 @@ dependencies = [
     "traitlets>=5.16.1",
 ]
 
+[project.optional-dependencies]
+external = [
+    "ase>=3.29.0",
+    "pymatgen>=2026.5.4",
+]
+all = [
+    "marimol[external]",
+]
+
 [build-system]
 requires = ["uv_build>=0.8.0,<0.9"]
 build-backend = "uv_build"
