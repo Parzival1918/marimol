@@ -237,7 +237,11 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     unitCell = model.get('unit_cell') || [];
                 }
 
-                const style = model.get('style') || 'vdw';
+                const style = model.get('style') || {};
+                const bondRadius = style.bond_radius !== undefined ? style.bond_radius : 0.0;
+                const atomicRadiusScaler = style.atomic_radius_scaler !== undefined ? style.atomic_radius_scaler : 1.0;
+                const fixedAtomicRadius = style.fixed_atomic_radius !== undefined ? style.fixed_atomic_radius : null;
+                const hydrogenAtomRadius = style.hydrogen_atom_radius !== undefined ? style.hydrogen_atom_radius : null;
                 const numAtoms = atoms.length;
                 
                 // Clear old meshes
@@ -256,7 +260,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 }
 
                 // Auto-compute bonds if not provided and style needs them
-                if (bonds.length === 0 && (style === 'ball-and-stick' || style === 'wireframe')) {
+                if (bonds.length === 0 && bondRadius > 0) {
                     bonds = [];
                     for(let i=0; i<numAtoms; i++) {
                         for(let j=i+1; j<numAtoms; j++) {
@@ -274,19 +278,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 }
 
                 // Determine styling parameters
-                let showBonds = false;
-                let bondRadius = 0.15;
-                
-                if (style === 'ball-and-stick') {
-                    showBonds = true;
-                    bondRadius = 0.15;
-                } else if (style === 'wireframe') {
-                    showBonds = true;
-                    bondRadius = 0.05;
-                } else {
-                    // vdw
-                    showBonds = false;
-                }
+                let showBonds = bondRadius > 0 && bonds.length > 0;
 
                 // --- ATOMS ---
                 atomMesh = new THREE.InstancedMesh(sphereGeometry, sphereMaterial, numAtoms);
@@ -297,12 +289,13 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     const pos = a.position || [0, 0, 0];
                     const col = a.color || [1, 1, 1];
                     let rad = a.radius || 1.0;
-                    if (style === 'ball-and-stick') {
-                        // Standard size 0.3, hydrogen (<0.4) slightly smaller at 0.2
-                        rad = (rad < 0.4) ? 0.2 : 0.3;
-                    } else if (style === 'wireframe') {
-                        // Match bond width exactly to prevent discontinuities
-                        rad = bondRadius;
+                    
+                    if (a.species === 1 && hydrogenAtomRadius != null) {
+                        rad = hydrogenAtomRadius;
+                    } else if (fixedAtomicRadius != null) {
+                        rad = fixedAtomicRadius;
+                    } else if (atomicRadiusScaler != null) {
+                        rad = rad * atomicRadiusScaler;
                     }
 
                     dummy.position.set(pos[0], pos[1], pos[2]);
@@ -664,7 +657,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     current_frame = traitlets.Int(0).tag(sync=True)
     selected_atom_index = traitlets.Int(-1).tag(sync=True)
     background_color = traitlets.Unicode('#ffffff').tag(sync=True)
-    style = traitlets.Unicode('vdw').tag(sync=True) # options: 'vdw', 'ball-and-stick', 'wireframe'
+    style = traitlets.Dict().tag(sync=True)
     show_axes = traitlets.Bool(False).tag(sync=True)
     projection = traitlets.Unicode('perspective').tag(sync=True) # 'perspective' or 'orthographic'
 
@@ -674,10 +667,32 @@ def view_molecule(atoms, bonds=None, unit_cell=None, style="vdw", background_col
     atoms format: [{"position": [x, y, z], "color": [r, g, b], "radius": r}, ...] OR a list of such lists for a trajectory.
     bonds format: [{"source": i, "target": j}, ...] OR a list of such lists.
     unit_cell format: [[v1x, v1y, v1z], [v2x, v2y, v2z], [v3x, v3y, v3z]] OR a list of such lists.
-    style options: 'vdw' (default), 'ball-and-stick', 'wireframe'
+    style options: 'vdw' (default), 'ball-and-stick', 'wireframe', or a custom dictionary.
     show_axes: bool, whether to display XYZ axes in the corner
     projection: 'perspective' (default) or 'orthographic'
     """
+    STYLES = {
+        "vdw": {
+            "bond_radius": 0.0,
+            "atomic_radius_scaler": 1.0,
+            "hydrogen_atom_radius": None,
+            "fixed_atomic_radius": None
+        },
+        "ball-and-stick": {
+            "bond_radius": 0.15,
+            "atomic_radius_scaler": None,
+            "hydrogen_atom_radius": 0.25,
+            "fixed_atomic_radius": 0.45
+        },
+        "wireframe": {
+            "bond_radius": 0.05,
+            "atomic_radius_scaler": None,
+            "hydrogen_atom_radius": 0.05,
+            "fixed_atomic_radius": 0.05
+        }
+    }
+    
+    resolved_style = STYLES.get(style, STYLES["vdw"]) if isinstance(style, str) else style
     resolved_bg = resolve_color(background_color)
     
     is_trajectory = len(atoms) > 0 and isinstance(atoms[0], list)
@@ -700,7 +715,7 @@ def view_molecule(atoms, bonds=None, unit_cell=None, style="vdw", background_col
             bonds=[],
             unit_cell=[],
             frames=frames_data,
-            style=style,
+            style=resolved_style,
             background_color=resolved_bg,
             show_axes=show_axes,
             projection=projection
@@ -711,7 +726,7 @@ def view_molecule(atoms, bonds=None, unit_cell=None, style="vdw", background_col
             bonds=bonds or [],
             unit_cell=unit_cell or [],
             frames=[],
-            style=style,
+            style=resolved_style,
             background_color=resolved_bg,
             show_axes=show_axes,
             projection=projection
