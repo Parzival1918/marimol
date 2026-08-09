@@ -115,11 +115,129 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             const mouse = new THREE.Vector2();
             const yAxis = new THREE.Vector3(0, 1, 0);
 
-            function updateScene() {
-                const atoms = model.get('atoms') || [];
-                let bonds = model.get('bonds') || [];
-                const style = model.get('style') || 'vdw';
+            // --- Trajectory UI Overlay ---
+            const uiContainer = document.createElement('div');
+            uiContainer.style.position = 'absolute';
+            uiContainer.style.top = '15px';
+            uiContainer.style.left = '15px';
+            uiContainer.style.zIndex = '10';
+            uiContainer.style.display = 'none'; // hidden by default
+            uiContainer.style.background = 'rgba(255, 255, 255, 0.7)';
+            uiContainer.style.backdropFilter = 'blur(10px)';
+            uiContainer.style.WebkitBackdropFilter = 'blur(10px)';
+            uiContainer.style.borderRadius = '8px';
+            uiContainer.style.padding = '8px 12px';
+            uiContainer.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+            uiContainer.style.fontFamily = 'sans-serif';
+            uiContainer.style.fontSize = '14px';
+            uiContainer.style.color = '#333';
+            uiContainer.style.alignItems = 'center';
+            uiContainer.style.gap = '8px';
+
+            const createBtn = (htmlContent, onClick) => {
+                const btn = document.createElement('button');
+                btn.innerHTML = htmlContent;
+                btn.style.background = 'transparent';
+                btn.style.border = 'none';
+                btn.style.borderRadius = '4px';
+                btn.style.cursor = 'pointer';
+                btn.style.padding = '4px';
+                btn.style.display = 'flex';
+                btn.style.alignItems = 'center';
+                btn.style.justifyContent = 'center';
+                btn.style.color = '#555';
+                btn.style.transition = 'background 0.2s';
+                btn.onclick = onClick;
+                btn.onmouseover = () => btn.style.background = 'rgba(0,0,0,0.08)';
+                btn.onmouseout = () => btn.style.background = 'transparent';
+                return btn;
+            };
+
+            const svgIcon = (path) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="${path}"></path></svg>`;
+            
+            const iconFirst = svgIcon("M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6 6 6z M6 6h2v12H6z");
+            const iconPrev = svgIcon("M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z");
+            const iconPlay = svgIcon("M8 5v14l11-7z");
+            const iconPause = svgIcon("M6 19h4V5H6v14zm8-14v14h4V5h-4z");
+            const iconNext = svgIcon("M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z");
+            const iconLast = svgIcon("M5.59 7.41L10.18 12l-4.59 4.59L7 18l6-6-6-6z M16 6h2v12h-2z");
+
+            let animationInterval = null;
+            let isPlaying = false;
+            
+            const btnFirst = createBtn(iconFirst, () => setFrame(0));
+            const btnPrev = createBtn(iconPrev, () => setFrame(model.get('current_frame') - 1));
+            const btnPlay = createBtn(iconPlay, () => togglePlay());
+            const btnNext = createBtn(iconNext, () => setFrame(model.get('current_frame') + 1));
+            const btnLast = createBtn(iconLast, () => {
+                const frames = model.get('frames');
+                if (frames && frames.length > 0) setFrame(frames.length - 1);
+            });
+            const frameCounter = document.createElement('span');
+            frameCounter.style.marginLeft = '8px';
+            frameCounter.style.minWidth = '50px';
+            frameCounter.style.textAlign = 'center';
+            frameCounter.style.fontWeight = '500';
+            frameCounter.innerText = '1 / 1';
+
+            uiContainer.appendChild(btnFirst);
+            uiContainer.appendChild(btnPrev);
+            uiContainer.appendChild(btnPlay);
+            uiContainer.appendChild(btnNext);
+            uiContainer.appendChild(btnLast);
+            uiContainer.appendChild(frameCounter);
+            container.appendChild(uiContainer);
+
+            function togglePlay() {
+                isPlaying = !isPlaying;
+                btnPlay.innerHTML = isPlaying ? iconPause : iconPlay;
+                if (isPlaying) {
+                    animationInterval = setInterval(() => {
+                        const frames = model.get('frames') || [];
+                        if (frames.length === 0) return;
+                        let next = model.get('current_frame') + 1;
+                        if (next >= frames.length) next = 0; // loop
+                        setFrame(next);
+                    }, 100);
+                } else {
+                    if (animationInterval) clearInterval(animationInterval);
+                }
+            }
+
+            function setFrame(idx) {
+                const frames = model.get('frames') || [];
+                if (!frames || frames.length === 0) return;
+                if (idx < 0) idx = frames.length - 1;
+                if (idx >= frames.length) idx = 0;
+                model.set('current_frame', idx);
+                model.save_changes();
+                updateScene();
+            }
+
+            let isCameraInitialized = false;
+
+            function updateScene(forceFitCamera = false) {
+                const frames = model.get('frames') || [];
+                const isTrajectory = frames.length > 0;
                 
+                let atoms, bonds, unitCell;
+                if (isTrajectory) {
+                    uiContainer.style.display = 'flex';
+                    const cFrame = model.get('current_frame');
+                    frameCounter.innerText = `${cFrame + 1} / ${frames.length}`;
+                    
+                    const fData = frames[cFrame] || {};
+                    atoms = fData.atoms || [];
+                    bonds = fData.bonds || [];
+                    unitCell = fData.unit_cell || [];
+                } else {
+                    uiContainer.style.display = 'none';
+                    atoms = model.get('atoms') || [];
+                    bonds = model.get('bonds') || [];
+                    unitCell = model.get('unit_cell') || [];
+                }
+
+                const style = model.get('style') || 'vdw';
                 const numAtoms = atoms.length;
                 
                 // Clear old meshes
@@ -252,7 +370,6 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 }
 
                 // --- UNIT CELL ---
-                const unitCell = model.get('unit_cell');
                 let cellCenter = null;
                 if (unitCell && unitCell.length === 3) {
                     const v1 = new THREE.Vector3().fromArray(unitCell[0]);
@@ -320,48 +437,52 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (numAtoms === 0 && !cellGroup) return;
 
                 // Auto-center and fit camera
-                const sceneCenter = new THREE.Vector3();
-                if (cellCenter) {
-                    sceneCenter.copy(cellCenter);
-                } else if (numAtoms > 0) {
-                    centerSum.divideScalar(numAtoms);
-                    sceneCenter.copy(centerSum);
-                }
-                controls.target.copy(sceneCenter);
-                
-                let maxDist = 0;
-                if (cellCenter) {
-                    // Base maxDist on the distance from cell center to the origin (half the main diagonal)
-                    maxDist = cellCenter.length();
-                } else if (numAtoms > 0) {
-                    for (let i = 0; i < numAtoms; i++) {
-                        const pos = new THREE.Vector3().fromArray(atoms[i].position);
-                        const dist = pos.distanceTo(sceneCenter);
-                        if (dist > maxDist) maxDist = dist;
+                if (!isCameraInitialized || forceFitCamera === true) {
+                    const sceneCenter = new THREE.Vector3();
+                    if (cellCenter) {
+                        sceneCenter.copy(cellCenter);
+                    } else if (numAtoms > 0) {
+                        centerSum.divideScalar(numAtoms);
+                        sceneCenter.copy(centerSum);
                     }
+                    controls.target.copy(sceneCenter);
+                    
+                    let maxDist = 0;
+                    if (cellCenter) {
+                        // Base maxDist on the distance from cell center to the origin (half the main diagonal)
+                        maxDist = cellCenter.length();
+                    } else if (numAtoms > 0) {
+                        for (let i = 0; i < numAtoms; i++) {
+                            const pos = new THREE.Vector3().fromArray(atoms[i].position);
+                            const dist = pos.distanceTo(sceneCenter);
+                            if (dist > maxDist) maxDist = dist;
+                        }
+                    }
+                    
+                    const cameraDist = Math.max(10, maxDist * 3);
+                    
+                    if (camera.isOrthographicCamera) {
+                        const aspect = container.clientWidth / container.clientHeight;
+                        // Provide a 1.5x margin so the molecule fits comfortably
+                        camera.left = -maxDist * aspect * 1.5;
+                        camera.right = maxDist * aspect * 1.5;
+                        camera.top = maxDist * 1.5;
+                        camera.bottom = -maxDist * 1.5;
+                        camera.updateProjectionMatrix();
+                    }
+                    
+                    camera.position.set(sceneCenter.x, sceneCenter.y, sceneCenter.z + cameraDist);
+                    controls.update();
+                    isCameraInitialized = true;
                 }
-                
-                const cameraDist = Math.max(10, maxDist * 3);
-                
-                if (camera.isOrthographicCamera) {
-                    const aspect = container.clientWidth / container.clientHeight;
-                    // Provide a 1.5x margin so the molecule fits comfortably
-                    camera.left = -maxDist * aspect * 1.5;
-                    camera.right = maxDist * aspect * 1.5;
-                    camera.top = maxDist * 1.5;
-                    camera.bottom = -maxDist * 1.5;
-                    camera.updateProjectionMatrix();
-                }
-                
-                camera.position.set(sceneCenter.x, sceneCenter.y, sceneCenter.z + cameraDist);
-                controls.update();
             }
 
             // Watch for changes from Python
-            model.on("change:atoms", updateScene);
-            model.on("change:bonds", updateScene);
-            model.on("change:style", updateScene);
-            model.on("change:unit_cell", updateScene);
+            model.on("change:atoms", () => updateScene(true));
+            model.on("change:frames", () => updateScene(true));
+            model.on("change:bonds", () => updateScene(true));
+            model.on("change:style", () => updateScene(false));
+            model.on("change:unit_cell", () => updateScene(true));
             model.on("change:background_color", () => {
                 container.style.backgroundColor = model.get('background_color');
             });
@@ -380,7 +501,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     } else {
                         camera.clearViewOffset();
                     }
-                    updateScene();
+                    updateScene(true);
                 }
             });
             updateScene();
@@ -539,6 +660,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     atoms = traitlets.List().tag(sync=True)
     bonds = traitlets.List(default_value=[]).tag(sync=True)
     unit_cell = traitlets.List(default_value=[]).tag(sync=True)
+    frames = traitlets.List(default_value=[]).tag(sync=True)
+    current_frame = traitlets.Int(0).tag(sync=True)
     selected_atom_index = traitlets.Int(-1).tag(sync=True)
     background_color = traitlets.Unicode('#ffffff').tag(sync=True)
     style = traitlets.Unicode('vdw').tag(sync=True) # options: 'vdw', 'ball-and-stick', 'wireframe'
@@ -548,21 +671,50 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 def view_molecule(atoms, bonds=None, unit_cell=None, style="vdw", background_color="white", show_axes=False, projection="perspective"):
     """
     Visualize a list of atoms using WebGL (Three.js).
-    atoms format: [{"position": [x, y, z], "color": [r, g, b], "radius": r}, ...]
-    bonds format: [{"source": i, "target": j}, ...]
-    unit_cell format: [[v1x, v1y, v1z], [v2x, v2y, v2z], [v3x, v3y, v3z]]
+    atoms format: [{"position": [x, y, z], "color": [r, g, b], "radius": r}, ...] OR a list of such lists for a trajectory.
+    bonds format: [{"source": i, "target": j}, ...] OR a list of such lists.
+    unit_cell format: [[v1x, v1y, v1z], [v2x, v2y, v2z], [v3x, v3y, v3z]] OR a list of such lists.
     style options: 'vdw' (default), 'ball-and-stick', 'wireframe'
     show_axes: bool, whether to display XYZ axes in the corner
     projection: 'perspective' (default) or 'orthographic'
     """
     resolved_bg = resolve_color(background_color)
-    widget = MoleculeViewerWidget(
-        atoms=atoms,
-        bonds=bonds or [],
-        unit_cell=unit_cell or [],
-        style=style,
-        background_color=resolved_bg,
-        show_axes=show_axes,
-        projection=projection
-    )
+    
+    is_trajectory = len(atoms) > 0 and isinstance(atoms[0], list)
+    
+    if is_trajectory:
+        frames_data = []
+        for i in range(len(atoms)):
+            # Handle variable bonds and unit cells across frames, or broadcast static ones
+            f_bonds = bonds[i] if bonds and len(bonds) > 0 and isinstance(bonds[0], list) and not isinstance(bonds[0][0], (int, float)) else (bonds or [])
+            f_cell = unit_cell[i] if unit_cell and len(unit_cell) > 0 and isinstance(unit_cell[0], list) and isinstance(unit_cell[0][0], list) else (unit_cell or [])
+            
+            frames_data.append({
+                "atoms": atoms[i],
+                "bonds": f_bonds,
+                "unit_cell": f_cell
+            })
+            
+        widget = MoleculeViewerWidget(
+            atoms=[],
+            bonds=[],
+            unit_cell=[],
+            frames=frames_data,
+            style=style,
+            background_color=resolved_bg,
+            show_axes=show_axes,
+            projection=projection
+        )
+    else:
+        widget = MoleculeViewerWidget(
+            atoms=atoms,
+            bonds=bonds or [],
+            unit_cell=unit_cell or [],
+            frames=[],
+            style=style,
+            background_color=resolved_bg,
+            show_axes=show_axes,
+            projection=projection
+        )
+        
     return mo.ui.anywidget(widget)
