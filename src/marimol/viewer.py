@@ -844,19 +844,22 @@ def view_molecule(data, style="ball-and-stick", background_color="white", show_a
             "bond_radius": 0.0,
             "atomic_radius_scaler": 1.0,
             "hydrogen_atom_radius": None,
-            "fixed_atomic_radius": None
+            "fixed_atomic_radius": None,
+            "use_vdw_radii": True
         },
         "ball-and-stick": {
             "bond_radius": 0.15,
             "atomic_radius_scaler": None,
             "hydrogen_atom_radius": 0.25,
-            "fixed_atomic_radius": 0.45
+            "fixed_atomic_radius": 0.45,
+            "use_vdw_radii": False
         },
         "wireframe": {
             "bond_radius": 0.05,
             "atomic_radius_scaler": None,
             "hydrogen_atom_radius": 0.05,
-            "fixed_atomic_radius": 0.05
+            "fixed_atomic_radius": 0.05,
+            "use_vdw_radii": False
         }
     }
     
@@ -866,14 +869,18 @@ def view_molecule(data, style="ball-and-stick", background_color="white", show_a
     is_trajectory = isinstance(data, list)
     frames_data = data if is_trajectory else [data]
     
-    from .utils import CPK_COLORS, ATOMIC_RADII, DEFAULT_COLOR, DEFAULT_RADIUS
+    from .utils import CPK_COLORS, ATOMIC_RADII, VDW_RADII, DEFAULT_COLOR, DEFAULT_RADIUS, DEFAULT_VDW_RADIUS
+    
+    use_vdw = resolved_style.get("use_vdw_radii", False)
+    sel_radius_map = VDW_RADII if use_vdw else ATOMIC_RADII
+    sel_default_radius = DEFAULT_VDW_RADIUS if use_vdw else DEFAULT_RADIUS
     
     widget = MoleculeViewerWidget(
         data=frames_data,
         color_map=CPK_COLORS,
-        radius_map=ATOMIC_RADII,
+        radius_map=sel_radius_map,
         default_color=DEFAULT_COLOR,
-        default_radius=DEFAULT_RADIUS,
+        default_radius=sel_default_radius,
         style=resolved_style,
         background_color=resolved_bg,
         show_axes=show_axes,

@@ -42,7 +42,28 @@ ATOMIC_RADII = {
     "Au": 1.36,
 }
 
+# Van der Waals radii (Angstroms) approx
+VDW_RADII = {
+    "H": 1.20,
+    "C": 1.70,
+    "N": 1.55,
+    "O": 1.52,
+    "F": 1.47,
+    "Cl": 1.75,
+    "Br": 1.85,
+    "I": 1.98,
+    "S": 1.80,
+    "P": 1.80,
+    "B": 1.92,
+    "Si": 2.10,
+    "Fe": 2.00,
+    "Cu": 1.40,
+    "Ag": 1.72,
+    "Au": 1.66,
+}
+
 DEFAULT_RADIUS = 0.8
+DEFAULT_VDW_RADIUS = 1.5
 
 def get_color(element_symbol: str) -> list[float]:
     """Return RGB float list for a given element symbol."""

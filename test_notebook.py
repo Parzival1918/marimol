@@ -26,7 +26,7 @@ def _():
         }
         frames_atoms.append(atoms)
 
-    viewer = view_molecule(frames_atoms, style="ball-and-stick", show_axes=True, projection="orthographic", fog=True, fog_strength=0.5, draw_outlines=True)
+    viewer = view_molecule(frames_atoms, style="vdw", show_axes=True, projection="orthographic", fog=True, fog_strength=0.5, draw_outlines=True)
     return mo, viewer
 
 
@@ -59,7 +59,7 @@ def _():
     from marimol.external import view_ase
 
     mol = molecule("CH4", vacuum=2)
-    view_ase(mol, style="wireframe", projection="orthographic", draw_outlines=True)
+    view_ase(mol, style="vdw", projection="orthographic", draw_outlines=True, outline=True)
     return mol, view_ase
 
 
@@ -78,7 +78,7 @@ def _(view_ase):
 
     tube = nanotube(6, 0, length=4)
     print(tube)
-    view_ase(tube, style="ball-and-stick", projection="orthographic")
+    view_ase(tube, style="vdw", projection="orthographic")
     return (tube,)
 
 
