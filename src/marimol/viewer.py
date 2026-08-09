@@ -39,11 +39,16 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             const scene = new THREE.Scene();
             
             // Add lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight.position.set(10, 20, 10);
-            scene.add(dirLight);
+            
+            const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.7);
+            dirLight1.position.set(10, 10, 10);
+            scene.add(dirLight1);
+            
+            const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+            dirLight2.position.set(-10, -10, -10);
+            scene.add(dirLight2);
 
             const persCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
             const orthoCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000);
@@ -555,6 +560,14 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     camera.position.set(sceneCenter.x, sceneCenter.y, sceneCenter.z + cameraDist);
                     controls.update();
                     isCameraInitialized = true;
+                    
+                    if (model.get('depth_fog')) {
+                        const bgColor = model.get('background_color') || '#ffffff';
+                        // Fog starts near the center of the molecule and fully obscures past the back
+                        scene.fog = new THREE.Fog(bgColor, cameraDist - maxDist * 0.5, cameraDist + maxDist * 1.5);
+                    } else {
+                        scene.fog = null;
+                    }
                 } else {
                     const targetDelta = new THREE.Vector3().subVectors(sceneCenter, controls.target);
                     if (targetDelta.lengthSq() > 0.0001) {
@@ -575,8 +588,12 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 container.style.height = model.get('height') || '400px';
             });
             model.on("change:outline", applyOutline);
+            model.on("change:depth_fog", () => updateScene(true));
             model.on("change:background_color", () => {
                 container.style.backgroundColor = model.get('background_color');
+                if (scene.fog) {
+                    scene.fog.color.set(model.get('background_color'));
+                }
             });
             model.on("change:projection", () => {
                 const newProj = model.get('projection');
@@ -764,8 +781,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     width = traitlets.Unicode('100%').tag(sync=True)
     height = traitlets.Unicode('400px').tag(sync=True)
     outline = traitlets.Any(default_value=False).tag(sync=True) # bool or str
+    depth_fog = traitlets.Bool(False).tag(sync=True)
 
-def view_molecule(data, style="vdw", background_color="white", show_axes=False, projection="orthographic", width="100%", height="400px", outline=False):
+def view_molecule(data, style="vdw", background_color="white", show_axes=False, projection="orthographic", width="100%", height="400px", outline=False, depth_fog=False):
     """
     Visualize a crystal or molecule using WebGL (Three.js).
     data format: a dictionary with keys: 'positions', 'species', 'bonds' (optional), 'unit_cell' (optional)
@@ -815,7 +833,8 @@ def view_molecule(data, style="vdw", background_color="white", show_axes=False, 
         projection=projection,
         width=width,
         height=height,
-        outline=outline
+        outline=outline,
+        depth_fog=depth_fog
     )
         
     return mo.ui.anywidget(widget)

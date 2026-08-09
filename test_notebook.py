@@ -26,7 +26,7 @@ def _():
         }
         frames_atoms.append(atoms)
 
-    viewer = view_molecule(frames_atoms, style="ball-and-stick", show_axes=True, projection="orthographic")
+    viewer = view_molecule(frames_atoms, style="ball-and-stick", show_axes=True, projection="orthographic", depth_fog=True)
     return mo, viewer
 
 
@@ -84,7 +84,7 @@ def _(view_ase):
 
 @app.cell
 def _(crys, mol, tube, view_ase):
-    view_ase([mol, crys, tube], style="ball-and-stick", projection="orthographic")
+    view_ase([mol, crys, tube], style="ball-and-stick", projection="orthographic", depth_fog=True)
     return
 
 
