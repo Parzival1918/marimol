@@ -26,7 +26,7 @@ def _():
         }
         frames_atoms.append(atoms)
 
-    viewer = view_molecule(frames_atoms, style="ball-and-stick", show_axes=True, projection="orthographic", fog=True, fog_strength=0.5)
+    viewer = view_molecule(frames_atoms, style="ball-and-stick", show_axes=True, projection="orthographic", fog=True, fog_strength=0.5, draw_outlines=True)
     return mo, viewer
 
 
@@ -58,8 +58,8 @@ def _():
     from ase.build import molecule
     from marimol.external import view_ase
 
-    mol = molecule("CH4", vacuum=4)
-    view_ase(mol, style="wireframe", projection="orthographic")
+    mol = molecule("CH4", vacuum=2)
+    view_ase(mol, style="wireframe", projection="orthographic", draw_outlines=True)
     return mol, view_ase
 
 
@@ -84,7 +84,7 @@ def _(view_ase):
 
 @app.cell
 def _(crys, mol, tube, view_ase):
-    view_ase([mol, crys, tube], style="ball-and-stick", projection="orthographic", fog=True, fog_strength=0.5)
+    view_ase([mol, crys, tube], style="ball-and-stick", projection="orthographic", fog=True, fog_strength=1, draw_outlines=True)
     return
 
 

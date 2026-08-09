@@ -127,8 +127,18 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 shininess: 60
             });
             
+            const outlineMaterial = new THREE.MeshBasicMaterial({
+                color: 0x000000,
+                side: THREE.BackSide,
+                polygonOffset: true,
+                polygonOffsetFactor: 1.5,
+                polygonOffsetUnits: 1.5
+            });
+            
             let atomMesh = null; // InstancedMesh for atoms
             let bondMesh = null; // InstancedMesh for bonds
+            let atomOutlineMesh = null;
+            let bondOutlineMesh = null;
             let cellGroup = null; // Group containing cell lines and labels
             const dummy = new THREE.Object3D();
             const colorObj = new THREE.Color();
@@ -338,6 +348,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 // Clear old meshes
                 if (atomMesh) { scene.remove(atomMesh); atomMesh.dispose(); atomMesh = null; }
                 if (bondMesh) { scene.remove(bondMesh); bondMesh.dispose(); bondMesh = null; }
+                if (atomOutlineMesh) { scene.remove(atomOutlineMesh); atomOutlineMesh.dispose(); atomOutlineMesh = null; }
+                if (bondOutlineMesh) { scene.remove(bondOutlineMesh); bondOutlineMesh.dispose(); bondOutlineMesh = null; }
                 if (cellGroup) { 
                     scene.remove(cellGroup); 
                     cellGroup.traverse((child) => {
@@ -375,7 +387,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 let showBonds = bondRadius > 0 && bonds.length > 0;
 
                 // --- ATOMS ---
+                const drawOutlines = model.get('draw_outlines');
                 atomMesh = new THREE.InstancedMesh(sphereGeometry, sphereMaterial, numAtoms);
+                if (drawOutlines) atomOutlineMesh = new THREE.InstancedMesh(sphereGeometry, outlineMaterial, numAtoms);
                 let centerSum = new THREE.Vector3(0, 0, 0);
 
                 for (let i = 0; i < numAtoms; i++) {
@@ -398,6 +412,13 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     dummy.quaternion.identity();
                     dummy.updateMatrix();
                     atomMesh.setMatrixAt(i, dummy.matrix);
+                    
+                    if (drawOutlines) {
+                        const outlineThickness = Math.min(0.04, rad * 0.2);
+                        dummy.scale.set(rad + outlineThickness, rad + outlineThickness, rad + outlineThickness);
+                        dummy.updateMatrix();
+                        atomOutlineMesh.setMatrixAt(i, dummy.matrix);
+                    }
 
                     colorObj.setRGB(col[0], col[1], col[2]);
                     atomMesh.setColorAt(i, colorObj);
@@ -408,10 +429,15 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 atomMesh.instanceMatrix.needsUpdate = true;
                 if (atomMesh.instanceColor) atomMesh.instanceColor.needsUpdate = true;
                 scene.add(atomMesh);
+                if (drawOutlines) {
+                    atomOutlineMesh.instanceMatrix.needsUpdate = true;
+                    scene.add(atomOutlineMesh);
+                }
 
                 // --- BONDS ---
                 if (showBonds && bonds.length > 0) {
                     bondMesh = new THREE.InstancedMesh(cylinderGeometry, cylinderMaterial, bonds.length * 2);
+                    if (drawOutlines) bondOutlineMesh = new THREE.InstancedMesh(cylinderGeometry, outlineMaterial, bonds.length);
                     const vA = new THREE.Vector3();
                     const vB = new THREE.Vector3();
                     const vDir = new THREE.Vector3();
@@ -448,10 +474,25 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         const colB = getColor(species[b.target]);
                         colorObj.setRGB(colB[0], colB[1], colB[2]);
                         bondMesh.setColorAt(i * 2 + 1, colorObj);
+
+                        // Single full-length outline cylinder
+                        if (drawOutlines) {
+                            const fullDist = vA.distanceTo(vB);
+                            const outlineThickness = Math.min(0.04, bondRadius * 0.2);
+                            dummy.position.copy(vMid);
+                            dummy.scale.set(bondRadius + outlineThickness, fullDist, bondRadius + outlineThickness);
+                            // quaternion is already set correctly for the direction
+                            dummy.updateMatrix();
+                            bondOutlineMesh.setMatrixAt(i, dummy.matrix);
+                        }
                     }
                     bondMesh.instanceMatrix.needsUpdate = true;
                     if (bondMesh.instanceColor) bondMesh.instanceColor.needsUpdate = true;
                     scene.add(bondMesh);
+                    if (drawOutlines) {
+                        bondOutlineMesh.instanceMatrix.needsUpdate = true;
+                        scene.add(bondOutlineMesh);
+                    }
                 }
 
                 // --- UNIT CELL ---
@@ -563,7 +604,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     
                     if (model.get('fog') && model.get('fog_strength') > 0) {
                         const bgColor = model.get('background_color') || '#ffffff';
-                        const strength = model.get('fog_strength') || 1.0;
+                        const strength = model.get('fog_strength') || 0.5;
                         const invS = 1.0 / strength;
                         // Fog starts near the center of the molecule and fully obscures past the back, scaled by strength
                         scene.fog = new THREE.Fog(bgColor, cameraDist - maxDist * 0.5 * invS, cameraDist + maxDist * 1.5 * invS);
@@ -592,6 +633,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             model.on("change:outline", applyOutline);
             model.on("change:fog", () => updateScene(true));
             model.on("change:fog_strength", () => updateScene(true));
+            model.on("change:draw_outlines", () => updateScene(true));
             model.on("change:background_color", () => {
                 container.style.backgroundColor = model.get('background_color');
                 if (scene.fog) {
@@ -785,9 +827,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     height = traitlets.Unicode('400px').tag(sync=True)
     outline = traitlets.Any(default_value=False).tag(sync=True) # bool or str
     fog = traitlets.Bool(False).tag(sync=True)
-    fog_strength = traitlets.Float(1.0).tag(sync=True)
+    fog_strength = traitlets.Float(0.5).tag(sync=True)
+    draw_outlines = traitlets.Bool(False).tag(sync=True)
 
-def view_molecule(data, style="vdw", background_color="white", show_axes=False, projection="orthographic", width="100%", height="400px", outline=False, fog=False, fog_strength=1.0):
+def view_molecule(data, style="ball-and-stick", background_color="white", show_axes=False, projection="orthographic", width="100%", height="400px", outline=False, fog=False, fog_strength=0.5, draw_outlines=False):
     """
     Visualize a crystal or molecule using WebGL (Three.js).
     data format: a dictionary with keys: 'positions', 'species', 'bonds' (optional), 'unit_cell' (optional)
@@ -839,7 +882,8 @@ def view_molecule(data, style="vdw", background_color="white", show_axes=False, 
         height=height,
         outline=outline,
         fog=fog,
-        fog_strength=fog_strength
+        fog_strength=fog_strength,
+        draw_outlines=draw_outlines
     )
         
     return mo.ui.anywidget(widget)
