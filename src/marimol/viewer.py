@@ -15,6 +15,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             container.style.width = '100%';
             container.style.height = '400px';
             container.style.display = 'block';
+            container.style.position = 'relative';
             container.style.backgroundColor = model.get('background_color') || '#ffffff';
             container.style.overflow = 'hidden';
             el.appendChild(container);
@@ -187,6 +188,59 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             uiContainer.appendChild(btnLast);
             uiContainer.appendChild(frameCounter);
             container.appendChild(uiContainer);
+
+            // --- Atom Info Panel ---
+            const infoPanel = document.createElement('div');
+            infoPanel.style.position = 'absolute';
+            infoPanel.style.bottom = '15px';
+            infoPanel.style.right = '15px';
+            infoPanel.style.zIndex = '10';
+            infoPanel.style.display = 'none'; // hidden by default
+            infoPanel.style.background = 'rgba(255, 255, 255, 0.7)';
+            infoPanel.style.backdropFilter = 'blur(10px)';
+            infoPanel.style.WebkitBackdropFilter = 'blur(10px)';
+            infoPanel.style.borderRadius = '8px';
+            infoPanel.style.padding = '12px';
+            infoPanel.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+            infoPanel.style.fontFamily = 'monospace';
+            infoPanel.style.fontSize = '12px';
+            infoPanel.style.color = '#333';
+            infoPanel.style.whiteSpace = 'pre';
+            container.appendChild(infoPanel);
+            
+            // Prevent clicks on UI panels from bubbling up and clearing the selection
+            uiContainer.addEventListener('click', (e) => e.stopPropagation());
+            infoPanel.addEventListener('click', (e) => e.stopPropagation());
+            
+            function updateInfoPanel() {
+                const idx = model.get('selected_atom_index');
+                if (idx < 0) {
+                    infoPanel.style.display = 'none';
+                    return;
+                }
+                const cFrame = model.get('current_frame');
+                const frames = model.get('frames') || [];
+                let atoms = [];
+                if (frames.length > 0 && frames[cFrame]) {
+                    atoms = frames[cFrame].atoms || [];
+                } else {
+                    atoms = model.get('atoms') || [];
+                }
+                
+                if (idx >= atoms.length) {
+                    infoPanel.style.display = 'none';
+                    return;
+                }
+                
+                const atom = atoms[idx];
+                const pos = atom.position || [0, 0, 0];
+                const species = atom.species !== undefined ? atom.species : '?';
+                
+                infoPanel.innerText = `Index:   ${idx}\nSpecies: ${species}\nPos:     [${pos[0].toFixed(3)}, ${pos[1].toFixed(3)}, ${pos[2].toFixed(3)}]`;
+                infoPanel.style.display = 'block';
+            }
+            model.on("change:selected_atom_index", updateInfoPanel);
+            model.on("change:current_frame", updateInfoPanel);
 
             function togglePlay() {
                 isPlaying = !isPlaying;

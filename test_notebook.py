@@ -29,7 +29,7 @@ def _():
         [0.0, 0.0, 2.0]
     ]
 
-    viewer = view_molecule(frames_atoms[0:5], unit_cell=unit_cell, style="ball-and-stick", show_axes=True, projection="orthographic")
+    viewer = view_molecule(frames_atoms, unit_cell=unit_cell, style="ball-and-stick", show_axes=True, projection="orthographic")
     return mo, viewer
 
 
