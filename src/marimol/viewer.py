@@ -561,10 +561,12 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     controls.update();
                     isCameraInitialized = true;
                     
-                    if (model.get('depth_fog')) {
+                    if (model.get('fog') && model.get('fog_strength') > 0) {
                         const bgColor = model.get('background_color') || '#ffffff';
-                        // Fog starts near the center of the molecule and fully obscures past the back
-                        scene.fog = new THREE.Fog(bgColor, cameraDist - maxDist * 0.5, cameraDist + maxDist * 1.5);
+                        const strength = model.get('fog_strength') || 1.0;
+                        const invS = 1.0 / strength;
+                        // Fog starts near the center of the molecule and fully obscures past the back, scaled by strength
+                        scene.fog = new THREE.Fog(bgColor, cameraDist - maxDist * 0.5 * invS, cameraDist + maxDist * 1.5 * invS);
                     } else {
                         scene.fog = null;
                     }
@@ -588,7 +590,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 container.style.height = model.get('height') || '400px';
             });
             model.on("change:outline", applyOutline);
-            model.on("change:depth_fog", () => updateScene(true));
+            model.on("change:fog", () => updateScene(true));
+            model.on("change:fog_strength", () => updateScene(true));
             model.on("change:background_color", () => {
                 container.style.backgroundColor = model.get('background_color');
                 if (scene.fog) {
@@ -781,9 +784,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     width = traitlets.Unicode('100%').tag(sync=True)
     height = traitlets.Unicode('400px').tag(sync=True)
     outline = traitlets.Any(default_value=False).tag(sync=True) # bool or str
-    depth_fog = traitlets.Bool(False).tag(sync=True)
+    fog = traitlets.Bool(False).tag(sync=True)
+    fog_strength = traitlets.Float(1.0).tag(sync=True)
 
-def view_molecule(data, style="vdw", background_color="white", show_axes=False, projection="orthographic", width="100%", height="400px", outline=False, depth_fog=False):
+def view_molecule(data, style="vdw", background_color="white", show_axes=False, projection="orthographic", width="100%", height="400px", outline=False, fog=False, fog_strength=1.0):
     """
     Visualize a crystal or molecule using WebGL (Three.js).
     data format: a dictionary with keys: 'positions', 'species', 'bonds' (optional), 'unit_cell' (optional)
@@ -834,7 +838,8 @@ def view_molecule(data, style="vdw", background_color="white", show_axes=False, 
         width=width,
         height=height,
         outline=outline,
-        depth_fog=depth_fog
+        fog=fog,
+        fog_strength=fog_strength
     )
         
     return mo.ui.anywidget(widget)
