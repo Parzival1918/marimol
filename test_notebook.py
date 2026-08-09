@@ -22,11 +22,12 @@ def _():
                 [2.0, 0.0, 0.0],
                 [0.0, 2.0, 0.0],
                 [0.0, 0.0, 2.0]
-            ]
+            ],
+            "labels": ["A", "B", "C"]
         }
         frames_atoms.append(atoms)
 
-    viewer = view_molecule(frames_atoms, style="vdw", show_axes=True, projection="orthographic", fog=True, fog_strength=0.5, draw_outlines=True)
+    viewer = view_molecule(frames_atoms, draw_labels=True, show_axes=True, projection="orthographic", fog=True, fog_strength=0.5, draw_outlines=True)
     return mo, viewer
 
 
@@ -59,7 +60,7 @@ def _():
     from marimol.external import view_ase
 
     mol = molecule("CH4", vacuum=2)
-    view_ase(mol, style="vdw", projection="orthographic", draw_outlines=True, outline=True)
+    view_ase(mol, style="wireframe", projection="orthographic", draw_outlines=True, outline=True, draw_labels=True)
     return mol, view_ase
 
 

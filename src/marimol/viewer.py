@@ -146,6 +146,19 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             const mouse = new THREE.Vector2();
             const yAxis = new THREE.Vector3(0, 1, 0);
 
+            // --- Atom Labels Overlay ---
+            const labelsContainer = document.createElement('div');
+            labelsContainer.style.position = 'absolute';
+            labelsContainer.style.top = '0';
+            labelsContainer.style.left = '0';
+            labelsContainer.style.width = '100%';
+            labelsContainer.style.height = '100%';
+            labelsContainer.style.pointerEvents = 'none';
+            labelsContainer.style.overflow = 'hidden';
+            labelsContainer.style.zIndex = '5';
+            container.appendChild(labelsContainer);
+            let labelElements = [];
+
             // --- Trajectory UI Overlay ---
             const uiContainer = document.createElement('div');
             uiContainer.style.position = 'absolute';
@@ -303,7 +316,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const frames = model.get('data') || [];
                 const isTrajectory = frames.length > 1;
                 
-                let positions = [], species = [], bonds = [], unitCell = [];
+                let positions = [], species = [], bonds = [], unitCell = [], customLabels = [];
                 if (isTrajectory) {
                     uiContainer.style.display = 'flex';
                     const cFrame = model.get('current_frame');
@@ -314,6 +327,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     species = fData.species || [];
                     bonds = fData.bonds || [];
                     unitCell = fData.unit_cell || [];
+                    customLabels = fData.labels || [];
                 } else {
                     uiContainer.style.display = 'none';
                     const fData = frames[0] || {};
@@ -321,6 +335,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     species = fData.species || [];
                     bonds = fData.bonds || [];
                     unitCell = fData.unit_cell || [];
+                    customLabels = fData.labels || [];
                 }
 
                 const style = model.get('style') || {};
@@ -385,6 +400,38 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
                 // Determine styling parameters
                 let showBonds = bondRadius > 0 && bonds.length > 0;
+
+                // --- ATOM LABELS ---
+                labelsContainer.innerHTML = '';
+                labelElements = [];
+                const drawLabels = model.get('draw_labels');
+                if (drawLabels) {
+                    for (let i = 0; i < numAtoms; i++) {
+                        let txt = species[i] !== undefined ? species[i] : '?';
+                        if (customLabels[i] !== undefined && customLabels[i] !== null) {
+                            txt = customLabels[i];
+                        }
+                        const el = document.createElement('div');
+                        el.innerText = txt;
+                        el.style.position = 'absolute';
+                        el.style.color = '#000';
+                        el.style.fontWeight = 'bold';
+                        el.style.fontSize = '12px';
+                        el.style.fontFamily = 'sans-serif';
+                        el.style.textShadow = '1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff';
+                        el.style.pointerEvents = 'none';
+                        el.style.left = '0px';
+                        el.style.top = '0px';
+                        el.style.transform = 'translate(-50%, -50%)';
+                        labelsContainer.appendChild(el);
+                        
+                        labelElements.push({
+                            el: el,
+                            pos: new THREE.Vector3().fromArray(positions[i] || [0,0,0]),
+                            index: i
+                        });
+                    }
+                }
 
                 // --- ATOMS ---
                 const drawOutlines = model.get('draw_outlines');
@@ -634,6 +681,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             model.on("change:fog", () => updateScene(true));
             model.on("change:fog_strength", () => updateScene(true));
             model.on("change:draw_outlines", () => updateScene(true));
+            model.on("change:draw_labels", () => updateScene(true));
             model.on("change:background_color", () => {
                 container.style.backgroundColor = model.get('background_color');
                 if (scene.fog) {
@@ -774,9 +822,49 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
             // Render Loop
             let animationId;
+            const _vec = new THREE.Vector3();
+            const _labelRaycaster = new THREE.Raycaster();
             function animate() {
                 animationId = requestAnimationFrame(animate);
                 controls.update();
+                
+                // Update Labels
+                if (labelElements.length > 0) {
+                    const hw = container.clientWidth / 2;
+                    const hh = container.clientHeight / 2;
+                    camera.updateMatrixWorld();
+                    for (let i = 0; i < labelElements.length; i++) {
+                        const item = labelElements[i];
+                        _vec.copy(item.pos).project(camera);
+                        if (_vec.z > 1.0 || _vec.z < -1.0) {
+                            item.el.style.display = 'none';
+                        } else {
+                            // Occlusion test
+                            _labelRaycaster.setFromCamera(_vec, camera);
+                            let occluded = false;
+                            if (atomMesh) {
+                                const hits = _labelRaycaster.intersectObject(atomMesh);
+                                if (hits.length > 0 && hits[0].instanceId !== item.index) {
+                                    occluded = true;
+                                } else if (bondMesh) {
+                                    const bHits = _labelRaycaster.intersectObject(bondMesh);
+                                    if (bHits.length > 0 && hits.length > 0 && bHits[0].distance < hits[0].distance) {
+                                        occluded = true;
+                                    }
+                                }
+                            }
+                            
+                            if (occluded) {
+                                item.el.style.display = 'none';
+                            } else {
+                                item.el.style.display = 'block';
+                                const x = (_vec.x * hw) + hw;
+                                const y = -(_vec.y * hh) + hh;
+                                item.el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+                            }
+                        }
+                    }
+                }
                 
                 // 1. Render main scene
                 renderer.setViewport(0, 0, container.clientWidth, container.clientHeight);
@@ -829,8 +917,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     fog = traitlets.Bool(False).tag(sync=True)
     fog_strength = traitlets.Float(0.5).tag(sync=True)
     draw_outlines = traitlets.Bool(False).tag(sync=True)
+    draw_labels = traitlets.Bool(False).tag(sync=True)
 
-def view_molecule(data, style="ball-and-stick", background_color="white", show_axes=False, projection="orthographic", width="100%", height="400px", outline=False, fog=False, fog_strength=0.5, draw_outlines=False):
+def view_molecule(data, style="ball-and-stick", background_color="white", show_axes=False, projection="orthographic", width="100%", height="400px", outline=False, fog=False, fog_strength=0.5, draw_outlines=False, draw_labels=False):
     """
     Visualize a crystal or molecule using WebGL (Three.js).
     data format: a dictionary with keys: 'positions', 'species', 'bonds' (optional), 'unit_cell' (optional)
@@ -890,7 +979,8 @@ def view_molecule(data, style="ball-and-stick", background_color="white", show_a
         outline=outline,
         fog=fog,
         fog_strength=fog_strength,
-        draw_outlines=draw_outlines
+        draw_outlines=draw_outlines,
+        draw_labels=draw_labels
     )
         
     return mo.ui.anywidget(widget)
