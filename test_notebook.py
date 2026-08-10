@@ -96,7 +96,7 @@ def _(view_ase):
     from ase.build import bulk
 
     crys = bulk("Cu", "hcp", a=3.6)
-    view_ase(crys, style="ball-and-stick", projection="orthographic")
+    view_ase(crys, style="ball-and-stick", projection="orthographic", show_axes=True)
     return (crys,)
 
 

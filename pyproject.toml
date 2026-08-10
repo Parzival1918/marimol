@@ -3,6 +3,7 @@ name = "marimol"
 version = "0.1.0"
 description = "Molecular visualizer for marimo notebooks"
 readme = "README.md"
+license = { text = "MIT" }
 authors = [
     { name = "Pedro Juan Royo", email = "pedro.juan.royo@gmail.com" }
 ]
