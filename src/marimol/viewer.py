@@ -1,9 +1,13 @@
 import anywidget
 import traitlets
 import marimo as mo
-from .utils import resolve_color
+from .utils import CPK_COLORS, ATOMIC_RADII, VDW_RADII, DEFAULT_COLOR, DEFAULT_RADIUS, DEFAULT_VDW_RADIUS, resolve_color
+
 
 class MoleculeViewerWidget(anywidget.AnyWidget):
+    """
+    A widget for visualizing molecules and periodic structures.
+    """
     _esm = """
     import * as THREE from 'https://esm.sh/three@0.160.0';
     import { TrackballControls } from 'https://esm.sh/three@0.160.0/addons/controls/TrackballControls.js';
@@ -1134,16 +1138,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     draw_labels = traitlets.Bool(False).tag(sync=True)
     measuring_tool = traitlets.Bool(False).tag(sync=True)
 
-def view_molecule(data, style="ball-and-stick", background_color="white", show_axes=False, projection="orthographic", width="100%", height="400px", outline=False, fog=False, fog_strength=0.5, draw_outlines=False, draw_labels=False, measuring_tool=False):
-    """
-    Visualize a crystal or molecule using WebGL (Three.js).
-    data format: a dictionary with keys: 'positions', 'species', 'bonds' (optional), 'unit_cell' (optional)
-                 OR a list of such dictionaries for a trajectory.
-    style options: 'vdw' (default), 'ball-and-stick', 'wireframe', or a custom dictionary.
-    show_axes: bool, whether to display XYZ axes in the corner
-    projection: 'orthographic' (default) or 'perspective'
-    """
-    STYLES = {
+
+STYLES = {
         "vdw": {
             "bond_radius": 0.0,
             "atomic_radius_scaler": 1.0,
@@ -1166,14 +1162,58 @@ def view_molecule(data, style="ball-and-stick", background_color="white", show_a
             "use_vdw_radii": False
         }
     }
-    
+
+
+def view_molecule(data: dict | list[dict], style: str = "ball-and-stick",
+                  background_color: str = "white", show_axes: bool = False,
+                  projection: str = "orthographic", width: str = "100%",
+                  height: str = "400px", outline: bool | str = False,
+                  fog: bool = False, fog_strength: float = 0.5,
+                  draw_outlines: bool = False, draw_labels: bool = False,
+                  measuring_tool: bool = False) -> mo.ui.anywidget:
+    """
+    Visualize a molecule or periodic structure in the notebook.
+
+    Parameters
+    ----------
+    data : dict or list[dict]
+        A dictionary with keys 'positions', 'species', 'bonds' (optional), 'unit_cell' (optional),
+        'labels' (optional), 'highlight' (optional), or a list of such dictionaries for a trajectory.
+    style : str or dict, optional
+        Style options: 'vdw' (default), 'ball-and-stick', 'wireframe', or a custom dictionary.
+    background_color : str, optional
+        Background color of the viewer.
+    show_axes : bool, optional
+        Whether to display XYZ axes in the corner.
+    projection : str, optional
+        Projection type: 'orthographic' (default) or 'perspective'.
+    width : str, optional
+        Width of the viewer.
+    height : str, optional
+        Height of the viewer.
+    outline : bool or str, optional
+        Whether to draw outlines around atoms.
+    fog : bool, optional
+        Whether to apply fog effect.
+    fog_strength : float, optional
+        Strength of the fog effect.
+    draw_outlines : bool, optional
+        Whether to draw outlines around atoms and bonds.
+    draw_labels : bool, optional
+        Whether to draw labels for atoms.
+    measuring_tool : bool, optional
+        Whether to enable measuring tool.
+
+    Returns
+    -------
+    marimo.ui.anywidget
+        The molecule viewer widget.
+    """
     resolved_style = STYLES.get(style, STYLES["vdw"]) if isinstance(style, str) else style
     resolved_bg = resolve_color(background_color)
     
     is_trajectory = isinstance(data, list)
     frames_data = data if is_trajectory else [data]
-    
-    from .utils import CPK_COLORS, ATOMIC_RADII, VDW_RADII, DEFAULT_COLOR, DEFAULT_RADIUS, DEFAULT_VDW_RADIUS
     
     use_vdw = resolved_style.get("use_vdw_radii", False)
     sel_radius_map = VDW_RADII if use_vdw else ATOMIC_RADII

@@ -22,6 +22,23 @@ CPK_COLORS = {
 # Default color for unknown elements (Pink)
 DEFAULT_COLOR = [1.0, 0.08, 0.58]
 
+# Common HTML/CSS color names to Hex mapping for backgrounds
+NAMED_COLORS = {
+    "white": "#ffffff",
+    "black": "#000000",
+    "red": "#ff0000",
+    "green": "#00ff00",
+    "blue": "#0000ff",
+    "yellow": "#ffff00",
+    "cyan": "#00ffff",
+    "magenta": "#ff00ff",
+    "gray": "#808080",
+    "grey": "#808080",
+    "lightgray": "#d3d3d3",
+    "darkgray": "#a9a9a9",
+    "transparent": "transparent",
+}
+
 # Covalent radii (Angstroms) approx
 ATOMIC_RADII = {
     "H": 0.31,
@@ -65,30 +82,16 @@ VDW_RADII = {
 DEFAULT_RADIUS = 0.8
 DEFAULT_VDW_RADIUS = 1.5
 
+
 def get_color(element_symbol: str) -> list[float]:
     """Return RGB float list for a given element symbol."""
     return CPK_COLORS.get(element_symbol.capitalize(), DEFAULT_COLOR)
+
 
 def get_radius(element_symbol: str) -> float:
     """Return atomic radius float for a given element symbol."""
     return ATOMIC_RADII.get(element_symbol.capitalize(), DEFAULT_RADIUS)
 
-# Common HTML/CSS color names to Hex mapping for backgrounds
-NAMED_COLORS = {
-    "white": "#ffffff",
-    "black": "#000000",
-    "red": "#ff0000",
-    "green": "#00ff00",
-    "blue": "#0000ff",
-    "yellow": "#ffff00",
-    "cyan": "#00ffff",
-    "magenta": "#ff00ff",
-    "gray": "#808080",
-    "grey": "#808080",
-    "lightgray": "#d3d3d3",
-    "darkgray": "#a9a9a9",
-    "transparent": "transparent",
-}
 
 def resolve_color(color_name: str) -> str:
     """
