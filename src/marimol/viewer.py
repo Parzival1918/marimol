@@ -677,27 +677,6 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     cellGroup = null;
                 }
 
-                // Auto-compute bonds if not provided and style needs them
-                if (bonds.length === 0 && bondRadius > 0) {
-                    bonds = [];
-                    for(let i=0; i<numAtoms; i++) {
-                        for(let j=i+1; j<numAtoms; j++) {
-                            const pA = positions[i];
-                            const pB = positions[j];
-                            const rA = getRadius(species[i]);
-                            const rB = getRadius(species[j]);
-                            const dx = pA[0] - pB[0];
-                            const dy = pA[1] - pB[1];
-                            const dz = pA[2] - pB[2];
-                            const dist = Math.hypot(dx, dy, dz);
-                            // 1.3 is a standard tolerance for covalent radii bonding
-                            if (dist > 0.1 && dist < (rA + rB) * 1.3) {
-                                bonds.push({source: i, target: j});
-                            }
-                        }
-                    }
-                }
-
                 // Determine styling parameters
                 let showBonds = bondRadius > 0 && bonds.length > 0;
 
@@ -1292,6 +1271,7 @@ def view_molecule(
     draw_outlines: bool = False,
     draw_labels: bool = False,
     measuring_tool: bool = False,
+    unwrap_molecules: bool = False,
 ) -> mo.ui.anywidget:
     """
     Visualize a molecule or periodic structure in the notebook.
@@ -1326,6 +1306,8 @@ def view_molecule(
         Whether to draw labels for atoms.
     measuring_tool : bool, optional
         Whether to enable measuring tool.
+    unwrap_molecules : bool, optional
+        Whether to unwrap molecules split across periodic boundaries.
 
     Returns
     -------
@@ -1338,7 +1320,20 @@ def view_molecule(
     is_trajectory = isinstance(data, list)
     frames_data = data if is_trajectory else [data]
 
+    if unwrap_molecules:
+        from .utils import unwrap_molecules as unwrap_molecules_func
+
+        frames_data = [unwrap_molecules_func(f) for f in frames_data]
+
     use_vdw = resolved_style.get("use_vdw_radii", False)
+    bond_radius = resolved_style.get("bond_radius", 0.0)
+
+    if bond_radius > 0:
+        from .utils import compute_bonds
+
+        for f in frames_data:
+            if not f.get("bonds"):
+                f["bonds"] = compute_bonds(f, use_pbc=True)
     sel_radius_map = VDW_RADII if use_vdw else ATOMIC_RADII
     sel_default_radius = DEFAULT_VDW_RADIUS if use_vdw else DEFAULT_RADIUS
 

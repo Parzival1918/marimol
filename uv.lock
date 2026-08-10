@@ -881,6 +881,8 @@ source = { editable = "." }
 dependencies = [
     { name = "anywidget" },
     { name = "marimo" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "traitlets" },
 ]
 
@@ -906,6 +908,7 @@ requires-dist = [
     { name = "ase", marker = "extra == 'external'", specifier = ">=3.29.0" },
     { name = "marimo", specifier = ">=0.23.16" },
     { name = "marimol", extras = ["external"], marker = "extra == 'all'" },
+    { name = "numpy", specifier = ">=2.4.6" },
     { name = "pymatgen", marker = "extra == 'external'", specifier = ">=2026.5.4" },
     { name = "traitlets", specifier = ">=5.16.1" },
 ]

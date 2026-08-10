@@ -23,7 +23,7 @@ def _():
                 [-0.75, 0.58 + offset, 0.0],
             ],
             "species": ["O", "H", "H"],
-            "unit_cell": [[2.0, 0.0, 0.0], [0.0, 2.0, 0.0], [0.0, 0.0, 2.0]],
+            "unit_cell": [[3.0, 0.0, 0.0], [0.0, 2.0, 0.0], [0.0, 0.0, 2.0]],
             "labels": ["A", "B", ""],
             "highlight": [1],
             "extra_data": {
@@ -120,6 +120,16 @@ def _(crys, mol, tube, view_ase):
         fog_strength=1,
         draw_outlines=True,
     )
+    return
+
+
+@app.cell
+def _(view_ase):
+    from ase.io import read
+
+    c1 = read("/Users/parzival1918/projects/cspy-git/opt_structure_1-P1-1-1-1.cif")
+    c2 = read("/Users/parzival1918/projects/cspy-git/opt_structure_2-P1-1-1-1.cif")
+    view_ase([c1, c2], unwrap_molecules=True, fog_strength=0.5, fog=True, draw_outlines=True)
     return
 
 
