@@ -24,8 +24,16 @@ def _():
             ],
             "species": ["O", "H", "H"],
             "unit_cell": [[2.0, 0.0, 0.0], [0.0, 2.0, 0.0], [0.0, 0.0, 2.0]],
-            "labels": ["A", "B", "C"],
+            "labels": ["A", "B", ""],
             "highlight": [1],
+            "extra_data": {
+                "energy": -10 * f,
+                "density": 1.4,
+                "energy2": -10 * f,
+                "density2": 1.4,
+                "energy3": -10 * f,
+                "density3": 1.4,
+            },
         }
         frames_atoms.append(atoms)
 

@@ -246,12 +246,23 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             uiContainer.appendChild(frameCounter);
             container.appendChild(uiContainer);
 
+            // --- Right Side UI (Container for Measure, Extra Data, Info Panel) ---
+            const rightSideContainer = document.createElement('div');
+            rightSideContainer.style.position = 'absolute';
+            rightSideContainer.style.top = '15px';
+            rightSideContainer.style.right = '15px';
+            rightSideContainer.style.bottom = '15px';
+            rightSideContainer.style.zIndex = '10';
+            rightSideContainer.style.display = 'flex';
+            rightSideContainer.style.flexDirection = 'column';
+            rightSideContainer.style.alignItems = 'flex-end';
+            rightSideContainer.style.gap = '8px';
+            rightSideContainer.style.pointerEvents = 'none';
+
             // --- Atom Info Panel ---
             const infoPanel = document.createElement('div');
-            infoPanel.style.position = 'absolute';
-            infoPanel.style.bottom = '15px';
-            infoPanel.style.right = '15px';
-            infoPanel.style.zIndex = '10';
+            infoPanel.style.marginTop = 'auto'; // push to the bottom
+            infoPanel.style.pointerEvents = 'auto';
             infoPanel.style.display = 'none'; // hidden by default
             infoPanel.style.background = 'rgba(255, 255, 255, 0.7)';
             infoPanel.style.backdropFilter = 'blur(10px)';
@@ -263,7 +274,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             infoPanel.style.fontSize = '12px';
             infoPanel.style.color = '#333';
             infoPanel.style.whiteSpace = 'pre';
-            container.appendChild(infoPanel);
+            rightSideContainer.appendChild(infoPanel);
 
             // Prevent clicks on UI panels from bubbling up and clearing the selection
             uiContainer.addEventListener('click', (e) => e.stopPropagation());
@@ -276,13 +287,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             let measureSpheres = [];
 
             const measureContainer = document.createElement('div');
-            measureContainer.style.position = 'absolute';
-            measureContainer.style.top = '15px';
-            measureContainer.style.right = '15px';
-            measureContainer.style.zIndex = '10';
             measureContainer.style.display = 'flex';
             measureContainer.style.flexDirection = 'column';
             measureContainer.style.alignItems = 'flex-end';
+            measureContainer.style.pointerEvents = 'auto';
 
             const rulerSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6" y2="10"></line><line x1="10" y1="6" x2="10" y2="10"></line><line x1="14" y1="6" x2="14" y2="10"></line><line x1="18" y1="6" x2="18" y2="10"></line></svg>`;
             const measureBtn = document.createElement('button');
@@ -317,8 +325,80 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
             measureContainer.appendChild(measureBtn);
             measureContainer.appendChild(measureLabel);
-            container.appendChild(measureContainer);
+            // rightSideContainer.insertBefore handles appending measureContainer later
             measureContainer.addEventListener('click', (e) => e.stopPropagation());
+
+            // --- Extra Data UI ---
+            const extraDataContainer = document.createElement('div');
+            extraDataContainer.style.display = 'none'; // Will be set to flex if data is present
+            extraDataContainer.style.flexDirection = 'column';
+            extraDataContainer.style.alignItems = 'flex-end';
+            extraDataContainer.style.pointerEvents = 'auto';
+            extraDataContainer.style.flexShrink = '1';
+            extraDataContainer.style.minHeight = '0';
+
+            const extraDataBtn = document.createElement('button');
+            const listSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>`;
+            extraDataBtn.innerHTML = listSvg;
+            extraDataBtn.style.color = '#333';
+            extraDataBtn.style.background = 'rgba(255, 255, 255, 0.7)';
+            extraDataBtn.style.border = 'none';
+            extraDataBtn.style.backdropFilter = 'blur(10px)';
+            extraDataBtn.style.WebkitBackdropFilter = 'blur(10px)';
+            extraDataBtn.style.borderRadius = '8px';
+            extraDataBtn.style.padding = '8px';
+            extraDataBtn.style.cursor = 'pointer';
+            extraDataBtn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+            extraDataBtn.style.transition = 'background 0.2s, transform 0.1s';
+            extraDataBtn.title = 'Toggle Extra Data';
+
+            let isExtraDataOpen = false;
+
+            extraDataBtn.onmouseover = () => { if (!isExtraDataOpen) { extraDataBtn.style.background = 'rgba(255,255,255,0.9)'; extraDataBtn.style.transform = 'scale(1.1)'; } };
+            extraDataBtn.onmouseout = () => { if (!isExtraDataOpen) { extraDataBtn.style.background = 'rgba(255,255,255,0.7)'; extraDataBtn.style.transform = 'scale(1)'; } };
+
+            const extraDataPanel = document.createElement('div');
+            extraDataPanel.style.marginTop = '8px';
+            extraDataPanel.style.padding = '12px';
+            extraDataPanel.style.background = 'rgba(255, 255, 255, 0.7)';
+            extraDataPanel.style.backdropFilter = 'blur(10px)';
+            extraDataPanel.style.WebkitBackdropFilter = 'blur(10px)';
+            extraDataPanel.style.borderRadius = '8px';
+            extraDataPanel.style.fontFamily = 'sans-serif';
+            extraDataPanel.style.fontSize = '13px';
+            extraDataPanel.style.color = '#333';
+            extraDataPanel.style.display = 'none';
+            extraDataPanel.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+            extraDataPanel.style.overflowY = 'auto';
+            extraDataPanel.style.flexShrink = '1';
+            extraDataPanel.style.minHeight = '0';
+
+            extraDataContainer.appendChild(extraDataBtn);
+            extraDataContainer.appendChild(extraDataPanel);
+
+            // Note: Since infoPanel has margin-top: auto, we want extraData to be above infoPanel in the DOM.
+            // rightSideContainer currently has infoPanel appended first.
+            // We should insert measureContainer and extraDataContainer BEFORE infoPanel so they appear at the top!
+            rightSideContainer.insertBefore(measureContainer, infoPanel);
+            rightSideContainer.insertBefore(extraDataContainer, infoPanel);
+            container.appendChild(rightSideContainer);
+
+            extraDataContainer.addEventListener('click', (e) => e.stopPropagation());
+
+            extraDataBtn.addEventListener('click', () => {
+                isExtraDataOpen = !isExtraDataOpen;
+                if (isExtraDataOpen) {
+                    extraDataBtn.style.background = '#00acc1';
+                    extraDataBtn.style.color = 'white';
+                    extraDataBtn.style.transform = 'scale(1.1)';
+                    extraDataPanel.style.display = 'block';
+                } else {
+                    extraDataBtn.style.background = 'rgba(255, 255, 255, 0.7)';
+                    extraDataBtn.style.color = '#333';
+                    extraDataBtn.style.transform = 'scale(1)';
+                    extraDataPanel.style.display = 'none';
+                }
+            });
 
             // Listen to traitlet
             measureContainer.style.display = model.get('measuring_tool') ? 'flex' : 'none';
@@ -504,7 +584,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const frames = model.get('data') || [];
                 const isTrajectory = frames.length > 1;
 
-                let positions = [], species = [], bonds = [], unitCell = [], customLabels = [], customHighlight = [];
+                let positions = [], species = [], bonds = [], unitCell = [], customLabels = [], customHighlight = [], extraData = null;
                 if (isTrajectory) {
                     uiContainer.style.display = 'flex';
                     const cFrame = model.get('current_frame');
@@ -517,6 +597,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     unitCell = fData.unit_cell || [];
                     customLabels = fData.labels || [];
                     customHighlight = fData.highlight || [];
+                    extraData = fData.extra_data || null;
                 } else {
                     uiContainer.style.display = 'none';
                     const fData = frames[0] || {};
@@ -526,6 +607,29 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     unitCell = fData.unit_cell || [];
                     customLabels = fData.labels || [];
                     customHighlight = fData.highlight || [];
+                    extraData = fData.extra_data || null;
+                }
+
+                if (extraData && Object.keys(extraData).length > 0) {
+                    extraDataContainer.style.display = 'flex';
+                    let html = '<table style="border-collapse: collapse; text-align: left;">';
+                    const entries = Object.entries(extraData);
+                    for (let i = 0; i < entries.length; i++) {
+                        const [k, v] = entries[i];
+                        let valStr = v;
+                        if (typeof v === 'number' && !Number.isInteger(v)) {
+                            valStr = v.toFixed(4);
+                        } else if (typeof v === 'object') {
+                            valStr = JSON.stringify(v);
+                        }
+                        const borderStyle = (i === entries.length - 1) ? '' : 'border-bottom: 1px solid rgba(0,0,0,0.1); ';
+                        html += `<tr><td style="padding-right: 12px; font-weight: bold; ${borderStyle}padding-top: 4px; padding-bottom: 4px;">${k}</td><td style="${borderStyle}padding-top: 4px; padding-bottom: 4px;">${valStr}</td></tr>`;
+                    }
+                    html += '</table>';
+                    extraDataPanel.innerHTML = html;
+                } else {
+                    extraDataContainer.style.display = 'none';
+                    if (isExtraDataOpen) extraDataBtn.click();
                 }
 
                 const style = model.get('style') || {};
@@ -1196,7 +1300,8 @@ def view_molecule(
     ----------
     data : dict or list[dict]
         A dictionary with keys 'positions', 'species', 'bonds' (optional), 'unit_cell' (optional),
-        'labels' (optional), 'highlight' (optional), or a list of such dictionaries for a trajectory.
+        'labels' (optional), 'highlight' (optional), 'extra_data' (optional) or a list of such dictionaries
+        for a trajectory.
     style : str or dict, optional
         Style options: 'vdw' (default), 'ball-and-stick', 'wireframe', or a custom dictionary.
     background_color : str, optional
