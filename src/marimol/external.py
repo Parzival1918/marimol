@@ -1,22 +1,24 @@
 from __future__ import annotations
-from .viewer import view_molecule
+
 import marimo as mo
 
+from .viewer import view_molecule
 
 __all__ = ["view_ase", "view_pymatgen"]
 
 
 try:
     import ase
+
     ASE = True
 except ImportError:
     ASE = False
 
 
-def _convert_ase_atoms(atoms: "ase.Atoms") -> dict:
+def _convert_ase_atoms(atoms: ase.Atoms) -> dict:
     symbols = atoms.get_chemical_symbols()
     positions = atoms.get_positions()
-    
+
     cell = atoms.get_cell().tolist()
     if not any(any(val != 0 for val in row) for row in cell):
         cell = None
@@ -25,11 +27,11 @@ def _convert_ase_atoms(atoms: "ase.Atoms") -> dict:
         "positions": positions.tolist(),
         "species": symbols,
         "bonds": [],
-        "unit_cell": cell
+        "unit_cell": cell,
     }
 
 
-def view_ase(atoms: "ase.Atoms" | list["ase.Atoms"], **kwargs) -> mo.ui.anywidget:
+def view_ase(atoms: ase.Atoms | list[ase.Atoms], **kwargs) -> mo.ui.anywidget:
     """
     Visualize ASE Atoms or list of Atoms objects.
 
@@ -47,7 +49,7 @@ def view_ase(atoms: "ase.Atoms" | list["ase.Atoms"], **kwargs) -> mo.ui.anywidge
     """
     if not ASE:
         raise ImportError("ASE is not installed. Please install it to use this function.")
-    
+
     if isinstance(atoms, list):
         data = []
         for frame in atoms:
@@ -59,25 +61,21 @@ def view_ase(atoms: "ase.Atoms" | list["ase.Atoms"], **kwargs) -> mo.ui.anywidge
 
 try:
     from pymatgen.core import Structure
+
     PYMATGEN = True
 except ImportError:
     PYMATGEN = False
 
 
-def _convert_pmg_structure(structure: "Structure") -> dict:
+def _convert_pmg_structure(structure: Structure) -> dict:
     species = [site.specie.symbol for site in structure.sites]
     positions = [site.coords.tolist() for site in structure.sites]
     cell = structure.lattice.matrix.tolist()
 
-    return {
-        "positions": positions,
-        "species": species,
-        "bonds": [],
-        "unit_cell": cell
-    }
+    return {"positions": positions, "species": species, "bonds": [], "unit_cell": cell}
 
 
-def view_pymatgen(structure: "Structure" | list["Structure"], **kwargs) -> mo.ui.anywidget:
+def view_pymatgen(structure: Structure | list[Structure], **kwargs) -> mo.ui.anywidget:
     """
     Visualize Pymatgen Structure or list of Structures.
 
@@ -95,7 +93,7 @@ def view_pymatgen(structure: "Structure" | list["Structure"], **kwargs) -> mo.ui
     """
     if not PYMATGEN:
         raise ImportError("Pymatgen is not installed. Please install it to use this function.")
-    
+
     if isinstance(structure, list):
         data = []
         for frag in structure:

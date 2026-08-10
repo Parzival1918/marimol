@@ -1,13 +1,23 @@
 import anywidget
-import traitlets
 import marimo as mo
-from .utils import CPK_COLORS, ATOMIC_RADII, VDW_RADII, DEFAULT_COLOR, DEFAULT_RADIUS, DEFAULT_VDW_RADIUS, resolve_color
+import traitlets
+
+from .utils import (
+    ATOMIC_RADII,
+    CPK_COLORS,
+    DEFAULT_COLOR,
+    DEFAULT_RADIUS,
+    DEFAULT_VDW_RADIUS,
+    VDW_RADII,
+    resolve_color,
+)
 
 
 class MoleculeViewerWidget(anywidget.AnyWidget):
     """
     A widget for visualizing molecules and periodic structures.
     """
+
     _esm = """
     import * as THREE from 'https://esm.sh/three@0.160.0';
     import { TrackballControls } from 'https://esm.sh/three@0.160.0/addons/controls/TrackballControls.js';
@@ -22,7 +32,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             container.style.position = 'relative';
             container.style.backgroundColor = model.get('background_color') || '#ffffff';
             container.style.overflow = 'hidden';
-            
+
             const applyOutline = () => {
                 const outl = model.get('outline');
                 if (outl === true) {
@@ -41,15 +51,15 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
             // Three.js setup
             const scene = new THREE.Scene();
-            
+
             // Add lighting
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambientLight);
-            
+
             const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.7);
             dirLight1.position.set(10, 10, 10);
             scene.add(dirLight1);
-            
+
             const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
             dirLight2.position.set(-10, -10, -10);
             scene.add(dirLight2);
@@ -57,7 +67,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             const persCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
             const orthoCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000);
             let camera = model.get('projection') === 'orthographic' ? orthoCamera : persCamera;
-            
+
             const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(container.clientWidth, container.clientHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -66,21 +76,21 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
             // Axes setup (overlay)
             const axesScene = new THREE.Scene();
-            
+
             // Custom Thick Axes
             const createAxis = (color, euler) => {
                 const material = new THREE.MeshBasicMaterial({ color: color });
                 const geometry = new THREE.CylinderGeometry(0.06, 0.06, 1.5, 8);
-                geometry.translate(0, 0.75, 0); 
+                geometry.translate(0, 0.75, 0);
                 const mesh = new THREE.Mesh(geometry, material);
                 mesh.setRotationFromEuler(euler);
                 axesScene.add(mesh);
             };
-            
+
             createAxis(0xff4444, new THREE.Euler(0, 0, -Math.PI/2)); // X (Red)
             createAxis(0x44ff44, new THREE.Euler(0, 0, 0));          // Y (Green)
             createAxis(0x4444ff, new THREE.Euler(Math.PI/2, 0, 0));  // Z (Blue)
-            
+
             // Canvas sprites for Labels
             // Canvas sprites for Labels
             const createLabel = (text, color, pos, depthTest = true) => {
@@ -92,7 +102,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(text, 64, 64);
-                
+
                 const texture = new THREE.CanvasTexture(canvas);
                 const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: depthTest });
                 const sprite = new THREE.Sprite(spriteMat);
@@ -100,13 +110,13 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 sprite.name = text; // Give a name for raycasting identification
                 return sprite;
             };
-            
+
             const xLbl = createLabel('X', '#ff4444', new THREE.Vector3(1.8, 0, 0), true);
             xLbl.scale.set(1.2, 1.2, 1.2); axesScene.add(xLbl);
-            
+
             const yLbl = createLabel('Y', '#44ff44', new THREE.Vector3(0, 1.8, 0), true);
             yLbl.scale.set(1.2, 1.2, 1.2); axesScene.add(yLbl);
-            
+
             const zLbl = createLabel('Z', '#4444ff', new THREE.Vector3(0, 0, 1.8), true);
             zLbl.scale.set(1.2, 1.2, 1.2); axesScene.add(zLbl);
             // Orthographic bounds: left, right, top, bottom, near, far
@@ -121,7 +131,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             // Geometry and Material for Atoms
             // We use a high segment count for smooth spheres, but InstancedMesh keeps it incredibly fast
             const sphereGeometry = new THREE.SphereGeometry(1, 32, 32);
-            const sphereMaterial = new THREE.MeshPhongMaterial({ 
+            const sphereMaterial = new THREE.MeshPhongMaterial({
                 color: 0xffffff,
                 shininess: 60
             });
@@ -130,7 +140,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 color: 0xffffff,
                 shininess: 60
             });
-            
+
             const outlineMaterial = new THREE.MeshBasicMaterial({
                 color: 0x000000,
                 side: THREE.BackSide,
@@ -138,7 +148,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 polygonOffsetFactor: 1.5,
                 polygonOffsetUnits: 1.5
             });
-            
+
             let atomMesh = null; // InstancedMesh for atoms
             let bondMesh = null; // InstancedMesh for bonds
             let atomOutlineMesh = null;
@@ -202,7 +212,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             };
 
             const svgIcon = (path) => `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="${path}"></path></svg>`;
-            
+
             const iconFirst = svgIcon("M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6 6 6z M6 6h2v12H6z");
             const iconPrev = svgIcon("M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z");
             const iconPlay = svgIcon("M8 5v14l11-7z");
@@ -212,7 +222,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
             let animationInterval = null;
             let isPlaying = false;
-            
+
             const btnFirst = createBtn(iconFirst, () => setFrame(0));
             const btnPrev = createBtn(iconPrev, () => setFrame(model.get('current_frame') - 1));
             const btnPlay = createBtn(iconPlay, () => togglePlay());
@@ -254,7 +264,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             infoPanel.style.color = '#333';
             infoPanel.style.whiteSpace = 'pre';
             container.appendChild(infoPanel);
-            
+
             // Prevent clicks on UI panels from bubbling up and clearing the selection
             uiContainer.addEventListener('click', (e) => e.stopPropagation());
             infoPanel.addEventListener('click', (e) => e.stopPropagation());
@@ -273,7 +283,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             measureContainer.style.display = 'flex';
             measureContainer.style.flexDirection = 'column';
             measureContainer.style.alignItems = 'flex-end';
-            
+
             const rulerSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6" y2="10"></line><line x1="10" y1="6" x2="10" y2="10"></line><line x1="14" y1="6" x2="14" y2="10"></line><line x1="18" y1="6" x2="18" y2="10"></line></svg>`;
             const measureBtn = document.createElement('button');
             measureBtn.innerHTML = rulerSvg;
@@ -351,7 +361,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     mesh.material.dispose();
                 });
                 measureSpheres = [];
-                
+
                 if (measureSelection.length === 0) {
                     if (isMeasuring) {
                         measureLabel.style.display = 'block';
@@ -382,13 +392,13 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     measureLineMesh.renderOrder = 999;
                     scene.add(measureLineMesh);
                 }
-                
+
                 if (measureSelection.length < 2) {
                     measureLabel.style.display = 'block';
                     measureLabel.innerText = 'Select atom 2...';
                     return;
                 }
-                
+
                 if (measureSelection.length === 2) {
                     const d = measureSelection[0].pos.distanceTo(measureSelection[1].pos);
                     measureLabel.innerText = `Dist: ${d.toFixed(3)} Å`;
@@ -432,7 +442,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     clearMeasurement();
                 }
             });
-            
+
             function updateInfoPanel() {
                 const idx = model.get('selected_atom_index');
                 if (idx < 0) {
@@ -447,15 +457,15 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     positions = frames[cFrame].positions || [];
                     species_list = frames[cFrame].species || [];
                 }
-                
+
                 if (idx >= positions.length) {
                     infoPanel.style.display = 'none';
                     return;
                 }
-                
+
                 const pos = positions[idx] || [0, 0, 0];
                 const species = species_list[idx] !== undefined ? species_list[idx] : '?';
-                
+
                 infoPanel.innerText = `Index:   ${idx}\nSpecies: ${species}\nPos:     [${pos[0].toFixed(3)}, ${pos[1].toFixed(3)}, ${pos[2].toFixed(3)}]`;
                 infoPanel.style.display = 'block';
             }
@@ -493,13 +503,13 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             function updateScene(forceFitCamera = false) {
                 const frames = model.get('data') || [];
                 const isTrajectory = frames.length > 1;
-                
+
                 let positions = [], species = [], bonds = [], unitCell = [], customLabels = [], customHighlight = [];
                 if (isTrajectory) {
                     uiContainer.style.display = 'flex';
                     const cFrame = model.get('current_frame');
                     frameCounter.innerText = `${cFrame + 1} / ${frames.length}`;
-                    
+
                     const fData = frames[cFrame] || {};
                     positions = fData.positions || [];
                     species = fData.species || [];
@@ -525,12 +535,12 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const hydrogenAtomRadius = style.hydrogen_atom_radius !== undefined ? style.hydrogen_atom_radius : null;
                 const isWireframe = (bondRadius === 0.05 && fixedAtomicRadius === 0.05);
                 const numAtoms = positions.length;
-                
+
                 const colorMap = model.get('color_map') || {};
                 const radiusMap = model.get('radius_map') || {};
                 const defaultColor = model.get('default_color') || [1, 0.08, 0.58];
                 const defaultRadius = model.get('default_radius') || 0.8;
-                
+
                 const capitalize = (s) => (typeof s === 'string' && s.length > 0) ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : String(s);
                 const getColor = (sp) => {
                     const c = colorMap[capitalize(sp)];
@@ -551,8 +561,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     measureLabel.style.display = 'block';
                     measureLabel.innerText = 'Select atom 1...';
                 }
-                if (cellGroup) { 
-                    scene.remove(cellGroup); 
+                if (cellGroup) {
+                    scene.remove(cellGroup);
                     cellGroup.traverse((child) => {
                         if (child.geometry) child.geometry.dispose();
                         if (child.material) {
@@ -560,7 +570,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                             child.material.dispose();
                         }
                     });
-                    cellGroup = null; 
+                    cellGroup = null;
                 }
 
                 // Auto-compute bonds if not provided and style needs them
@@ -610,7 +620,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         el.style.top = '0px';
                         el.style.transform = 'translate(-50%, -50%)';
                         labelsContainer.appendChild(el);
-                        
+
                         labelElements.push({
                             el: el,
                             pos: new THREE.Vector3().fromArray(positions[i] || [0,0,0]),
@@ -630,7 +640,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     const sp = species[i] !== undefined ? species[i] : '?';
                     const col = getColor(sp);
                     let rad = getRadius(sp);
-                    
+
                     if ((sp === 1 || sp === 'H' || sp === 'h') && hydrogenAtomRadius != null) {
                         rad = hydrogenAtomRadius;
                     } else if (fixedAtomicRadius != null) {
@@ -645,7 +655,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     dummy.quaternion.identity();
                     dummy.updateMatrix();
                     atomMesh.setMatrixAt(i, dummy.matrix);
-                    
+
                     if (drawOutlines) {
                         const outlineThickness = Math.min(0.04, rad * 0.2);
                         dummy.scale.set(rad + outlineThickness, rad + outlineThickness, rad + outlineThickness);
@@ -659,10 +669,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         colorObj.setRGB(col[0], col[1], col[2]);
                     }
                     atomMesh.setColorAt(i, colorObj);
-                    
+
                     centerSum.add(dummy.position);
                 }
-                
+
                 atomMesh.instanceMatrix.needsUpdate = true;
                 if (atomMesh.instanceColor) atomMesh.instanceColor.needsUpdate = true;
                 scene.add(atomMesh);
@@ -676,30 +686,30 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (showBonds && bonds.length > 0) {
                     bondMesh = new THREE.InstancedMesh(cylinderGeometry, cylinderMaterial, bonds.length * 2);
                     if (drawOutlines) bondOutlineMesh = new THREE.InstancedMesh(cylinderGeometry, outlineMaterial, bonds.length);
-                    
+
 
                     const vA = new THREE.Vector3();
                     const vB = new THREE.Vector3();
                     const vDir = new THREE.Vector3();
                     const vMid = new THREE.Vector3();
-                    
+
                     for (let i = 0; i < bonds.length; i++) {
                         const b = bonds[i];
-                        
+
                         vA.fromArray(positions[b.source] || [0,0,0]);
                         vB.fromArray(positions[b.target] || [0,0,0]);
                         vMid.copy(vA).lerp(vB, 0.5);
-                        
+
                         const distance = vA.distanceTo(vMid);
                         vDir.subVectors(vB, vA).normalize();
-                        
+
                         // First half (Atom A to Midpoint)
                         dummy.position.copy(vA).lerp(vMid, 0.5);
                         dummy.scale.set(bondRadius, distance, bondRadius);
                         dummy.quaternion.setFromUnitVectors(yAxis, vDir);
                         dummy.updateMatrix();
                         bondMesh.setMatrixAt(i * 2, dummy.matrix);
-                        
+
                         if (customHighlight && customHighlight.includes(b.source)) {
                             colorObj.setRGB(0, 1, 1);
                         } else {
@@ -707,14 +717,14 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                             colorObj.setRGB(colA[0], colA[1], colA[2]);
                         }
                         bondMesh.setColorAt(i * 2, colorObj);
-                        
+
                         // Second half (Midpoint to Atom B)
                         dummy.position.copy(vMid).lerp(vB, 0.5);
                         dummy.scale.set(bondRadius, distance, bondRadius);
                         // quaternion stays the same since direction is the same
                         dummy.updateMatrix();
                         bondMesh.setMatrixAt(i * 2 + 1, dummy.matrix);
-                        
+
                         if (customHighlight && customHighlight.includes(b.target)) {
                             colorObj.setRGB(0, 1, 1);
                         } else {
@@ -749,7 +759,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     const v1 = new THREE.Vector3().fromArray(unitCell[0]);
                     const v2 = new THREE.Vector3().fromArray(unitCell[1]);
                     const v3 = new THREE.Vector3().fromArray(unitCell[2]);
-                    
+
                     const origin = new THREE.Vector3(0,0,0);
                     const p12 = v1.clone().add(v2);
                     const p13 = v1.clone().add(v3);
@@ -757,7 +767,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     const p123 = v1.clone().add(v2).add(v3);
 
                     cellGroup = new THREE.Group();
-                    
+
                     // Helper to create thick cylinders for main vectors
                     const createThickVector = (v, colorHex) => {
                         const len = v.length();
@@ -765,46 +775,46 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         const geo = new THREE.CylinderGeometry(0.04, 0.04, len, 8);
                         geo.translate(0, len / 2, 0);
                         const mesh = new THREE.Mesh(geo, mat);
-                        
+
                         const q = new THREE.Quaternion();
                         q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), v.clone().normalize());
                         mesh.setRotationFromQuaternion(q);
                         return mesh;
                     };
-                    
+
                     // a, b, c vectors as thick shaded cylinders
                     cellGroup.add(createThickVector(v1, 0xff4444));
                     cellGroup.add(createThickVector(v2, 0x44ff44));
                     cellGroup.add(createThickVector(v3, 0x4444ff));
-                    
+
                     const vertices = [];
                     const addEdge = (p1, p2) => {
                         vertices.push(p1.x, p1.y, p1.z, p2.x, p2.y, p2.z);
                     };
-                    
+
                     // Remaining unit cell edges as thin wireframes
                     addEdge(v1, p12); addEdge(v1, p13);
                     addEdge(v2, p12); addEdge(v2, p23);
                     addEdge(v3, p13); addEdge(v3, p23);
                     addEdge(p12, p123); addEdge(p13, p123); addEdge(p23, p123);
-                    
+
                     const geo = new THREE.BufferGeometry();
                     geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
                     const mat = new THREE.LineBasicMaterial({ color: 0x888888 });
                     const cellLines = new THREE.LineSegments(geo, mat);
                     cellGroup.add(cellLines);
-                    
+
                     const aLbl = createLabel('a', '#ff4444', v1.clone().add(v1.clone().normalize().multiplyScalar(0.2)));
                     aLbl.scale.set(0.4, 0.4, 0.4); cellGroup.add(aLbl);
-                    
+
                     const bLbl = createLabel('b', '#44ff44', v2.clone().add(v2.clone().normalize().multiplyScalar(0.2)));
                     bLbl.scale.set(0.4, 0.4, 0.4); cellGroup.add(bLbl);
-                    
+
                     const cLbl = createLabel('c', '#4444ff', v3.clone().add(v3.clone().normalize().multiplyScalar(0.2)));
                     cLbl.scale.set(0.4, 0.4, 0.4); cellGroup.add(cLbl);
-                    
+
                     scene.add(cellGroup);
-                    
+
                     cellCenter = p123.clone().multiplyScalar(0.5);
                 }
 
@@ -821,7 +831,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
                 if (!isCameraInitialized || forceFitCamera === true) {
                     controls.target.copy(sceneCenter);
-                    
+
                     let maxDist = 0;
                     if (cellCenter) {
                         // Base maxDist on the distance from cell center to the origin (half the main diagonal)
@@ -833,9 +843,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                             if (dist > maxDist) maxDist = dist;
                         }
                     }
-                    
+
                     const cameraDist = Math.max(10, maxDist * 3);
-                    
+
                     if (camera.isOrthographicCamera) {
                         const aspect = container.clientWidth / container.clientHeight;
                         // Provide a 1.5x margin so the molecule fits comfortably
@@ -845,11 +855,11 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         camera.bottom = -maxDist * 1.5;
                         camera.updateProjectionMatrix();
                     }
-                    
+
                     camera.position.set(sceneCenter.x, sceneCenter.y, sceneCenter.z + cameraDist);
                     controls.update();
                     isCameraInitialized = true;
-                    
+
                     if (model.get('fog') && model.get('fog_strength') > 0) {
                         const bgColor = model.get('background_color') || '#ffffff';
                         const strength = model.get('fog_strength') || 0.5;
@@ -895,10 +905,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (camera !== newCamera) {
                     newCamera.position.copy(camera.position);
                     newCamera.quaternion.copy(camera.quaternion);
-                    
+
                     camera = newCamera;
                     controls.object = camera;
-                    
+
                     if (panX !== 0 || panY !== 0) {
                         camera.setViewOffset(container.clientWidth, container.clientHeight, panX, panY, container.clientWidth, container.clientHeight);
                     } else {
@@ -915,7 +925,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             let isPanning = false;
 
             container.addEventListener('contextmenu', e => e.preventDefault());
-            
+
             container.addEventListener('mousedown', (e) => {
                 if (e.button === 2) {
                     isPanning = true;
@@ -944,7 +954,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             const resizeObserver = new ResizeObserver(() => {
                 if (container.clientWidth === 0 || container.clientHeight === 0) return;
                 const aspect = container.clientWidth / container.clientHeight;
-                
+
                 if (camera.isOrthographicCamera) {
                     const height = camera.top;
                     camera.left = -height * aspect;
@@ -952,7 +962,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 } else {
                     camera.aspect = aspect;
                 }
-                
+
                 if (panX !== 0 || panY !== 0) {
                     camera.setViewOffset(container.clientWidth, container.clientHeight, panX, panY, container.clientWidth, container.clientHeight);
                 } else {
@@ -974,11 +984,11 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (model.get('show_axes') && cx >= 10 && cx <= 90 && cy >= container.clientHeight - 90 && cy <= container.clientHeight - 10) {
                     const axX = ((cx - 10) / 80) * 2 - 1;
                     const axY = -((cy - (container.clientHeight - 90)) / 80) * 2 + 1;
-                    
+
                     const axesMouse = new THREE.Vector2(axX, axY);
                     raycaster.setFromCamera(axesMouse, axesCamera);
                     const intersects = raycaster.intersectObjects(axesScene.children, true);
-                    
+
                     if (intersects.length > 0) {
                         for (const hit of intersects) {
                             if (hit.object.name === 'X' || hit.object.name === 'Y' || hit.object.name === 'Z') {
@@ -1045,7 +1055,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             function animate() {
                 animationId = requestAnimationFrame(animate);
                 controls.update();
-                
+
                 // Update Labels
                 if (labelElements.length > 0) {
                     const hw = container.clientWidth / 2;
@@ -1071,7 +1081,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                                     }
                                 }
                             }
-                            
+
                             if (occluded) {
                                 item.el.style.display = 'none';
                             } else {
@@ -1083,19 +1093,19 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         }
                     }
                 }
-                
+
                 // 1. Render main scene
                 renderer.setViewport(0, 0, container.clientWidth, container.clientHeight);
                 renderer.clear();
                 renderer.render(scene, camera);
-                
+
                 // 2. Render axes overlay in bottom left if requested
                 if (model.get('show_axes')) {
                     // Position axes camera behind the origin to match main camera orientation
                     axesCamera.position.copy(camera.position).sub(controls.target).normalize().multiplyScalar(4);
                     // Instead of lookAt (which suffers from Gimbal lock when aligned with Y), directly copy the exact rotation
                     axesCamera.quaternion.copy(camera.quaternion);
-                    
+
                     renderer.clearDepth();
                     // Draw in bottom left corner (80x80)
                     renderer.setViewport(10, 10, 80, 80);
@@ -1122,16 +1132,16 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     radius_map = traitlets.Dict().tag(sync=True)
     default_color = traitlets.List().tag(sync=True)
     default_radius = traitlets.Float().tag(sync=True)
-    
+
     current_frame = traitlets.Int(0).tag(sync=True)
     selected_atom_index = traitlets.Int(-1).tag(sync=True)
-    background_color = traitlets.Unicode('#ffffff').tag(sync=True)
+    background_color = traitlets.Unicode("#ffffff").tag(sync=True)
     style = traitlets.Dict().tag(sync=True)
     show_axes = traitlets.Bool(False).tag(sync=True)
-    projection = traitlets.Unicode('orthographic').tag(sync=True) # 'perspective' or 'orthographic'
-    width = traitlets.Unicode('100%').tag(sync=True)
-    height = traitlets.Unicode('400px').tag(sync=True)
-    outline = traitlets.Any(default_value=False).tag(sync=True) # bool or str
+    projection = traitlets.Unicode("orthographic").tag(sync=True)  # 'perspective' or 'orthographic'
+    width = traitlets.Unicode("100%").tag(sync=True)
+    height = traitlets.Unicode("400px").tag(sync=True)
+    outline = traitlets.Any(default_value=False).tag(sync=True)  # bool or str
     fog = traitlets.Bool(False).tag(sync=True)
     fog_strength = traitlets.Float(0.5).tag(sync=True)
     draw_outlines = traitlets.Bool(False).tag(sync=True)
@@ -1140,37 +1150,45 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
 
 STYLES = {
-        "vdw": {
-            "bond_radius": 0.0,
-            "atomic_radius_scaler": 1.0,
-            "hydrogen_atom_radius": None,
-            "fixed_atomic_radius": None,
-            "use_vdw_radii": True
-        },
-        "ball-and-stick": {
-            "bond_radius": 0.15,
-            "atomic_radius_scaler": None,
-            "hydrogen_atom_radius": 0.25,
-            "fixed_atomic_radius": 0.45,
-            "use_vdw_radii": False
-        },
-        "wireframe": {
-            "bond_radius": 0.05,
-            "atomic_radius_scaler": None,
-            "hydrogen_atom_radius": 0.05,
-            "fixed_atomic_radius": 0.05,
-            "use_vdw_radii": False
-        }
-    }
+    "vdw": {
+        "bond_radius": 0.0,
+        "atomic_radius_scaler": 1.0,
+        "hydrogen_atom_radius": None,
+        "fixed_atomic_radius": None,
+        "use_vdw_radii": True,
+    },
+    "ball-and-stick": {
+        "bond_radius": 0.15,
+        "atomic_radius_scaler": None,
+        "hydrogen_atom_radius": 0.25,
+        "fixed_atomic_radius": 0.45,
+        "use_vdw_radii": False,
+    },
+    "wireframe": {
+        "bond_radius": 0.05,
+        "atomic_radius_scaler": None,
+        "hydrogen_atom_radius": 0.05,
+        "fixed_atomic_radius": 0.05,
+        "use_vdw_radii": False,
+    },
+}
 
 
-def view_molecule(data: dict | list[dict], style: str = "ball-and-stick",
-                  background_color: str = "white", show_axes: bool = False,
-                  projection: str = "orthographic", width: str = "100%",
-                  height: str = "400px", outline: bool | str = False,
-                  fog: bool = False, fog_strength: float = 0.5,
-                  draw_outlines: bool = False, draw_labels: bool = False,
-                  measuring_tool: bool = False) -> mo.ui.anywidget:
+def view_molecule(
+    data: dict | list[dict],
+    style: str = "ball-and-stick",
+    background_color: str = "white",
+    show_axes: bool = False,
+    projection: str = "orthographic",
+    width: str = "100%",
+    height: str = "400px",
+    outline: bool | str = False,
+    fog: bool = False,
+    fog_strength: float = 0.5,
+    draw_outlines: bool = False,
+    draw_labels: bool = False,
+    measuring_tool: bool = False,
+) -> mo.ui.anywidget:
     """
     Visualize a molecule or periodic structure in the notebook.
 
@@ -1211,14 +1229,14 @@ def view_molecule(data: dict | list[dict], style: str = "ball-and-stick",
     """
     resolved_style = STYLES.get(style, STYLES["vdw"]) if isinstance(style, str) else style
     resolved_bg = resolve_color(background_color)
-    
+
     is_trajectory = isinstance(data, list)
     frames_data = data if is_trajectory else [data]
-    
+
     use_vdw = resolved_style.get("use_vdw_radii", False)
     sel_radius_map = VDW_RADII if use_vdw else ATOMIC_RADII
     sel_default_radius = DEFAULT_VDW_RADIUS if use_vdw else DEFAULT_RADIUS
-    
+
     widget = MoleculeViewerWidget(
         data=frames_data,
         color_map=CPK_COLORS,
@@ -1236,7 +1254,7 @@ def view_molecule(data: dict | list[dict], style: str = "ball-and-stick",
         fog_strength=fog_strength,
         draw_outlines=draw_outlines,
         draw_labels=draw_labels,
-        measuring_tool=measuring_tool
+        measuring_tool=measuring_tool,
     )
-        
+
     return mo.ui.anywidget(widget)

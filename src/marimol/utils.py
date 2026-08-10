@@ -1,22 +1,22 @@
 # CPK Colors and standard atomic radii (in Angstroms) for visualization
 
 CPK_COLORS = {
-    "H": [1.0, 1.0, 1.0],      # White
-    "C": [0.56, 0.56, 0.56],   # Light Grey
-    "N": [0.19, 0.31, 0.97],   # Blue
-    "O": [1.0, 0.05, 0.05],    # Red
-    "F": [0.56, 0.88, 0.31],   # Green
+    "H": [1.0, 1.0, 1.0],  # White
+    "C": [0.56, 0.56, 0.56],  # Light Grey
+    "N": [0.19, 0.31, 0.97],  # Blue
+    "O": [1.0, 0.05, 0.05],  # Red
+    "F": [0.56, 0.88, 0.31],  # Green
     "Cl": [0.12, 0.94, 0.12],  # Green
     "Br": [0.65, 0.16, 0.16],  # Dark Red
-    "I": [0.58, 0.0, 0.58],    # Purple
-    "S": [1.0, 0.78, 0.20],    # Yellow
-    "P": [1.0, 0.50, 0.0],     # Orange
-    "B": [1.0, 0.71, 0.71],    # Peach
+    "I": [0.58, 0.0, 0.58],  # Purple
+    "S": [1.0, 0.78, 0.20],  # Yellow
+    "P": [1.0, 0.50, 0.0],  # Orange
+    "B": [1.0, 0.71, 0.71],  # Peach
     "Si": [0.94, 0.78, 0.63],  # Tan
     "Fe": [0.88, 0.40, 0.20],  # Orange-red
     "Cu": [0.78, 0.50, 0.20],  # Copper
     "Ag": [0.75, 0.75, 0.75],  # Silver
-    "Au": [1.0, 0.82, 0.14],   # Gold
+    "Au": [1.0, 0.82, 0.14],  # Gold
 }
 
 # Default color for unknown elements (Pink)
