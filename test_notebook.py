@@ -121,7 +121,7 @@ def _(crys, mol, tube, view_ase):
         fog=True,
         fog_strength=1,
         draw_outlines=True,
-        spin=True,
+        spin=False,
     )
     return
 

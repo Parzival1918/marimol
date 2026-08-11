@@ -144,9 +144,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             const outlineMaterial = new THREE.MeshBasicMaterial({
                 color: 0x000000,
                 side: THREE.BackSide,
-                polygonOffset: true,
-                polygonOffsetFactor: 1.5,
-                polygonOffsetUnits: 1.5
+                depthWrite: false
             });
 
             let atomMesh = null; // InstancedMesh for atoms
@@ -715,7 +713,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 // --- ATOMS ---
                 const drawOutlines = model.get('draw_outlines');
                 atomMesh = new THREE.InstancedMesh(sphereGeometry, sphereMaterial, numAtoms);
-                if (drawOutlines) atomOutlineMesh = new THREE.InstancedMesh(sphereGeometry, outlineMaterial, numAtoms);
+                if (drawOutlines) {
+                    atomOutlineMesh = new THREE.InstancedMesh(sphereGeometry, outlineMaterial, numAtoms);
+                    atomOutlineMesh.renderOrder = 1;
+                }
                 let centerSum = new THREE.Vector3(0, 0, 0);
 
                 for (let i = 0; i < numAtoms; i++) {
@@ -768,7 +769,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 // --- BONDS ---
                 if (showBonds && bonds.length > 0) {
                     bondMesh = new THREE.InstancedMesh(cylinderGeometry, cylinderMaterial, bonds.length * 2);
-                    if (drawOutlines) bondOutlineMesh = new THREE.InstancedMesh(cylinderGeometry, outlineMaterial, bonds.length);
+                    if (drawOutlines) {
+                        bondOutlineMesh = new THREE.InstancedMesh(cylinderGeometry, outlineMaterial, bonds.length);
+                        bondOutlineMesh.renderOrder = 1;
+                    }
 
 
                     const vA = new THREE.Vector3();
