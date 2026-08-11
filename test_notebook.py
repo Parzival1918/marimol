@@ -87,6 +87,8 @@ def _():
         draw_outlines=True,
         outline=True,
         draw_labels=True,
+        spin=True,
+        spin_axis=[1, 1, 1],
     )
     return mol, view_ase
 
@@ -119,6 +121,7 @@ def _(crys, mol, tube, view_ase):
         fog=True,
         fog_strength=1,
         draw_outlines=True,
+        spin=True,
     )
     return
 
@@ -129,7 +132,7 @@ def _(view_ase):
 
     c1 = read("/Users/parzival1918/projects/cspy-git/opt_structure_1-P1-1-1-1.cif")
     c2 = read("/Users/parzival1918/projects/cspy-git/opt_structure_2-P1-1-1-1.cif")
-    view_ase([c1, c2], unwrap_molecules=True, fog_strength=0.5, fog=True, draw_outlines=True)
+    view_ase([c1, c2], unwrap_molecules=True, fog_strength=0.5, fog=True, draw_outlines=True, spin=True, spin_speed=1.0)
     return
 
 

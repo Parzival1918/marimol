@@ -940,6 +940,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     }
 
                     camera.position.set(sceneCenter.x, sceneCenter.y, sceneCenter.z + cameraDist);
+
                     controls.update();
                     isCameraInitialized = true;
 
@@ -1137,6 +1138,21 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             const _labelRaycaster = new THREE.Raycaster();
             function animate() {
                 animationId = requestAnimationFrame(animate);
+
+                if (model.get("spin") && model.get("spin_speed") !== 0) {
+                    const speed = model.get("spin_speed") * 0.01;
+                    const axisArr = model.get("spin_axis");
+                    const axis = new THREE.Vector3(axisArr[0], axisArr[1], axisArr[2]).normalize();
+                    if (axis.lengthSq() > 0.001) {
+                        camera.position.sub(controls.target);
+                        camera.position.applyAxisAngle(axis, speed);
+                        camera.position.add(controls.target);
+
+                        camera.up.applyAxisAngle(axis, speed);
+                        camera.lookAt(controls.target);
+                    }
+                }
+
                 controls.update();
 
                 // Update Labels
@@ -1230,6 +1246,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     draw_outlines = traitlets.Bool(False).tag(sync=True)
     draw_labels = traitlets.Bool(False).tag(sync=True)
     measuring_tool = traitlets.Bool(False).tag(sync=True)
+    spin = traitlets.Bool(False).tag(sync=True)
+    spin_axis = traitlets.List(default_value=[0.0, 1.0, 0.0]).tag(sync=True)
+    spin_speed = traitlets.Float(2.0).tag(sync=True)
 
 
 STYLES = {
@@ -1272,6 +1291,9 @@ def view_molecule(
     draw_labels: bool = False,
     measuring_tool: bool = False,
     unwrap_molecules: bool = False,
+    spin: bool = False,
+    spin_axis: tuple[float, float, float] = (0.0, 1.0, 0.0),
+    spin_speed: float = 2.0,
 ) -> mo.ui.anywidget:
     """
     Visualize a molecule or periodic structure in the notebook.
@@ -1308,6 +1330,13 @@ def view_molecule(
         Whether to enable measuring tool.
     unwrap_molecules : bool, optional
         Whether to unwrap molecules split across periodic boundaries.
+    spin : bool, optional
+        Whether to spin the structure.
+    spin_axis : tuple[float, float, float], optional
+        The axis of rotation, in cartesian coordinates. Default is (0.0, 1.0, 0.0).
+    spin_speed : float, optional
+        The speed of rotation. Default is 2.0. The rotation is clockwise, if an
+        anticlockwise rotation is desired, use a negative value.
 
     Returns
     -------
@@ -1355,6 +1384,9 @@ def view_molecule(
         draw_outlines=draw_outlines,
         draw_labels=draw_labels,
         measuring_tool=measuring_tool,
+        spin=spin,
+        spin_axis=list(spin_axis),
+        spin_speed=spin_speed,
     )
 
     return mo.ui.anywidget(widget)
