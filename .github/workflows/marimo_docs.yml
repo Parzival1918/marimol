@@ -28,12 +28,12 @@ jobs:
 
             - name: 📄 Export notebook
               run: |
-                  uv run marimo export html-wasm test_notebook.py -o docs --mode run
+                  uv run marimo export html test_notebook.py -o index.html --no-include-code
 
             - name: 📦 Upload Pages Artifact
               uses: actions/upload-pages-artifact@v3
               with:
-                  path: docs
+                  path: index.html
 
     deploy:
         needs: build

@@ -11,14 +11,14 @@ requires-python = ">=3.11"
 dependencies = [
     "anywidget>=0.11.0",
     "marimo>=0.23.16",
-    "numpy>=2.4.6",
+    "numpy>=2",
     "traitlets>=5.16.1",
 ]
 
 [project.optional-dependencies]
 external = [
-    "ase>=3.29.0",
-    "pymatgen>=2026.5.4",
+    "ase",
+    "pymatgen",
 ]
 all = [
     "marimol[external]",

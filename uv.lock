@@ -905,11 +905,11 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anywidget", specifier = ">=0.11.0" },
-    { name = "ase", marker = "extra == 'external'", specifier = ">=3.29.0" },
+    { name = "ase", marker = "extra == 'external'" },
     { name = "marimo", specifier = ">=0.23.16" },
     { name = "marimol", extras = ["external"], marker = "extra == 'all'" },
-    { name = "numpy", specifier = ">=2.4.6" },
-    { name = "pymatgen", marker = "extra == 'external'", specifier = ">=2026.5.4" },
+    { name = "numpy", specifier = ">=2" },
+    { name = "pymatgen", marker = "extra == 'external'" },
     { name = "traitlets", specifier = ">=5.16.1" },
 ]
 provides-extras = ["external", "all"]
