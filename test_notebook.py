@@ -126,15 +126,5 @@ def _(crys, mol, tube, view_ase):
     return
 
 
-@app.cell
-def _(view_ase):
-    from ase.io import read
-
-    c1 = read("/Users/parzival1918/projects/cspy-git/opt_structure_1-P1-1-1-1.cif")
-    c2 = read("/Users/parzival1918/projects/cspy-git/opt_structure_2-P1-1-1-1.cif")
-    view_ase([c1, c2], unwrap_molecules=True, fog_strength=0.5, fog=True, draw_outlines=True, spin=True, spin_speed=1.0)
-    return
-
-
 if __name__ == "__main__":
     app.run()
