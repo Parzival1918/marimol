@@ -4,6 +4,16 @@ __generated_with = "0.23.16"
 app = marimo.App()
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    # marimol
+
+    > A python package to visualize molecules and periodic structures in marimo notebooks.
+    """)
+    return
+
+
 @app.cell
 def _():
     import math
