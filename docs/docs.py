@@ -10,7 +10,58 @@ def _(mo):
     # marimol
 
     > A python package to visualize molecules and periodic structures in marimo notebooks.
+
+    This package provides a simple API to visualize molecular structures, and can visualize __ase.Atoms__ or __pymatgen.core.Structure__ objects directly. The package allows the user to configure how the amount of information shown in the visualizations, as well as the style in which the structures are drawn.
+
+    ## Installation
+
+    To install __marimol__ simply use:
+
+    ```bash
+    pip install marimol
+    ```
+
+    ## Usage
+
+    To visualize a structure, load the function for the type of data you have:
+
+    ```python
+    # for the data interface defined by marimol, explained further down in this document
+    from marimol import view_molecule
+
+    # for ase.Atoms
+    from marimol import view_ase
+
+    # for pymatge.core.Structure
+    from marimol import view_pymatgen
+    ```
+
+    and call it with an instance of the class or a list of items for visualizing a trajectory (UI elements for moving through the trajectory will be shown in the viewer). For example, if we want to visualize a methane molecule with the __ase__ interface:
+
+    ```python
+    from marimol import view_ase
+    from ase.build import molecule
+
+    mol = molecule("CH4")
+    view_ase(mol)
+    ```
+
+    Which will result in the following (you can interact with it! Drag it, spin it, and zoom 😀):
     """)
+    return
+
+
+@app.cell
+def _():
+    def methane_viz():
+        from ase.build import molecule
+
+        from marimol import view_ase
+
+        _mol = molecule("CH4")
+        return view_ase(_mol)
+
+    methane_viz()
     return
 
 
