@@ -1,4 +1,4 @@
-name: Generate WASM notebook
+name: Generate html notebook docs
 
 on:
   push:
@@ -28,7 +28,7 @@ jobs:
 
             - name: 📄 Export notebook
               run: |
-                  uv run marimo export html test_notebook.py -o docs/index.html --no-include-code
+                  uv run marimo export html docs/docs.py -o docs/index.html --no-include-code
 
             - name: 📦 Upload Pages Artifact
               uses: actions/upload-pages-artifact@v3

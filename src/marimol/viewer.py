@@ -144,7 +144,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             const outlineMaterial = new THREE.MeshBasicMaterial({
                 color: 0x000000,
                 side: THREE.BackSide,
-                depthWrite: false
+                depthWrite: true
             });
 
             let atomMesh = null; // InstancedMesh for atoms
