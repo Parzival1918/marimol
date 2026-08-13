@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import marimo as mo
 
-from .viewer import view_molecule
+from .viewer import view_structure
 
 __all__ = ["view_ase", "view_pymatgen"]
 
@@ -15,6 +15,18 @@ except ImportError:
     ASE = False
 
 
+def _to_json_compatible(val):
+    if hasattr(val, "tolist"):
+        return val.tolist()
+    if hasattr(val, "item"):
+        return val.item()
+    if isinstance(val, dict):
+        return {k: _to_json_compatible(v) for k, v in val.items()}
+    if isinstance(val, (list, tuple)):
+        return [_to_json_compatible(v) for v in val]
+    return val
+
+
 def _convert_ase_atoms(atoms: ase.Atoms) -> dict:
     symbols = atoms.get_chemical_symbols()
     positions = atoms.get_positions()
@@ -23,24 +35,38 @@ def _convert_ase_atoms(atoms: ase.Atoms) -> dict:
     if not any(any(val != 0 for val in row) for row in cell):
         cell = None
 
-    return {
+    extra_data = {}
+    if hasattr(atoms, "info") and atoms.info:
+        extra_data.update(atoms.info)
+    if hasattr(atoms, "calc") and atoms.calc is not None and hasattr(atoms.calc, "results") and atoms.calc.results:
+        for k, v in atoms.calc.results.items():
+            if k not in extra_data:
+                extra_data[k] = v
+
+    data = {
         "positions": positions.tolist(),
         "species": symbols,
         "bonds": [],
         "unit_cell": cell,
     }
+    if extra_data:
+        data["extra_data"] = {k: _to_json_compatible(v) for k, v in extra_data.items()}
+
+    return data
 
 
 def view_ase(atoms: ase.Atoms | list[ase.Atoms], **kwargs) -> mo.ui.anywidget:
     """
-    Visualize ASE Atoms or list of Atoms objects.
+    Visualize ASE Atoms or list of Atoms objects. Data stored in the `info` attribute
+    and `calc.results` attribute are automatically added to the `extra_data` attribute
+    of the data dictionary.
 
     Parameters
     ----------
     atoms : ase.Atoms | list[ase.Atoms]
         ASE Atoms object or list of ASE Atoms objects to visualize.
     **kwargs
-        Additional keyword arguments to pass to :func:`~marimol.viewer.view_molecule`.
+        Additional keyword arguments to pass to :func:`~marimol.viewer.view_structure`.
 
     Returns
     -------
@@ -54,9 +80,9 @@ def view_ase(atoms: ase.Atoms | list[ase.Atoms], **kwargs) -> mo.ui.anywidget:
         data = []
         for frame in atoms:
             data.append(_convert_ase_atoms(frame))
-        return view_molecule(data, **kwargs)
+        return view_structure(data, **kwargs)
     else:
-        return view_molecule(_convert_ase_atoms(atoms), **kwargs)
+        return view_structure(_convert_ase_atoms(atoms), **kwargs)
 
 
 try:
@@ -84,7 +110,7 @@ def view_pymatgen(structure: Structure | list[Structure], **kwargs) -> mo.ui.any
     structure : Structure | list[Structure]
         Pymatgen Structure object or list of Pymatgen Structure objects to visualize.
     **kwargs
-        Additional keyword arguments to pass to :func:`~marimol.viewer.view_molecule`.
+        Additional keyword arguments to pass to :func:`~marimol.viewer.view_structure`.
 
     Returns
     -------
@@ -98,6 +124,6 @@ def view_pymatgen(structure: Structure | list[Structure], **kwargs) -> mo.ui.any
         data = []
         for frag in structure:
             data.append(_convert_pmg_structure(frag))
-        return view_molecule(data, **kwargs)
+        return view_structure(data, **kwargs)
     else:
-        return view_molecule(_convert_pmg_structure(structure), **kwargs)
+        return view_structure(_convert_pmg_structure(structure), **kwargs)

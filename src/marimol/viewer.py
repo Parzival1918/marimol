@@ -34,7 +34,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             container.style.overflow = 'hidden';
 
             const applyOutline = () => {
-                const outl = model.get('outline');
+                const outl = model.get('viewer_outline');
                 if (outl === true) {
                     container.style.border = '1px solid #ccc';
                     container.style.borderRadius = '4px';
@@ -224,6 +224,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             const btnFirst = createBtn(iconFirst, () => setFrame(0));
             const btnPrev = createBtn(iconPrev, () => setFrame(model.get('current_frame') - 1));
             const btnPlay = createBtn(iconPlay, () => togglePlay());
+            btnPlay.style.display = model.get('multi_traj') !== false ? 'flex' : 'none';
             const btnNext = createBtn(iconNext, () => setFrame(model.get('current_frame') + 1));
             const btnLast = createBtn(iconLast, () => {
                 const frames = model.get('data');
@@ -554,13 +555,15 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 isPlaying = !isPlaying;
                 btnPlay.innerHTML = isPlaying ? iconPause : iconPlay;
                 if (isPlaying) {
+                    const fps = model.get('traj_fps') || 10;
+                    const intervalMs = Math.max(1, Math.round(1000 / fps));
                     animationInterval = setInterval(() => {
                         const frames = model.get('data') || [];
                         if (frames.length === 0) return;
                         let next = model.get('current_frame') + 1;
                         if (next >= frames.length) next = 0; // loop
                         setFrame(next);
-                    }, 100);
+                    }, intervalMs);
                 } else {
                     if (animationInterval) clearInterval(animationInterval);
                 }
@@ -585,6 +588,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 let positions = [], species = [], bonds = [], unitCell = [], customLabels = [], customHighlight = [], extraData = null;
                 if (isTrajectory) {
                     uiContainer.style.display = 'flex';
+                    btnPlay.style.display = model.get('multi_traj') !== false ? 'flex' : 'none';
                     const cFrame = model.get('current_frame');
                     frameCounter.innerText = `${cFrame + 1} / ${frames.length}`;
 
@@ -976,11 +980,32 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             model.on("change:height", () => {
                 container.style.height = model.get('height') || '400px';
             });
-            model.on("change:outline", applyOutline);
+            model.on("change:viewer_outline", applyOutline);
             model.on("change:fog", () => updateScene(true));
             model.on("change:fog_strength", () => updateScene(true));
             model.on("change:draw_outlines", () => updateScene(true));
             model.on("change:draw_labels", () => updateScene(true));
+            model.on("change:multi_traj", () => {
+                const showPlay = model.get('multi_traj') !== false;
+                btnPlay.style.display = showPlay ? 'flex' : 'none';
+                if (!showPlay && isPlaying) {
+                    togglePlay();
+                }
+            });
+            model.on("change:traj_fps", () => {
+                if (isPlaying) {
+                    if (animationInterval) clearInterval(animationInterval);
+                    const fps = model.get('traj_fps') || 10;
+                    const intervalMs = Math.max(1, Math.round(1000 / fps));
+                    animationInterval = setInterval(() => {
+                        const frames = model.get('data') || [];
+                        if (frames.length === 0) return;
+                        let next = model.get('current_frame') + 1;
+                        if (next >= frames.length) next = 0;
+                        setFrame(next);
+                    }, intervalMs);
+                }
+            });
             model.on("change:background_color", () => {
                 container.style.backgroundColor = model.get('background_color');
                 if (scene.fog) {
@@ -1244,7 +1269,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     projection = traitlets.Unicode("orthographic").tag(sync=True)  # 'perspective' or 'orthographic'
     width = traitlets.Unicode("100%").tag(sync=True)
     height = traitlets.Unicode("400px").tag(sync=True)
-    outline = traitlets.Any(default_value=False).tag(sync=True)  # bool or str
+    viewer_outline = traitlets.Any(default_value=False).tag(sync=True)  # bool or str
     fog = traitlets.Bool(False).tag(sync=True)
     fog_strength = traitlets.Float(0.5).tag(sync=True)
     draw_outlines = traitlets.Bool(False).tag(sync=True)
@@ -1253,6 +1278,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     spin = traitlets.Bool(False).tag(sync=True)
     spin_axis = traitlets.List(default_value=[0.0, 1.0, 0.0]).tag(sync=True)
     spin_speed = traitlets.Float(2.0).tag(sync=True)
+    multi_traj = traitlets.Bool(True).tag(sync=True)
+    traj_fps = traitlets.Float(10.0).tag(sync=True)
 
 
 STYLES = {
@@ -1280,7 +1307,7 @@ STYLES = {
 }
 
 
-def view_molecule(
+def view_structure(
     data: dict | list[dict],
     style: str = "ball-and-stick",
     background_color: str = "white",
@@ -1288,7 +1315,7 @@ def view_molecule(
     projection: str = "orthographic",
     width: str = "100%",
     height: str = "400px",
-    outline: bool | str = False,
+    viewer_outline: bool | str = False,
     fog: bool = False,
     fog_strength: float = 0.5,
     draw_outlines: bool = False,
@@ -1298,6 +1325,8 @@ def view_molecule(
     spin: bool = False,
     spin_axis: tuple[float, float, float] = (0.0, 1.0, 0.0),
     spin_speed: float = 2.0,
+    multi_traj: bool = True,
+    traj_fps: float = 10.0,
 ) -> mo.ui.anywidget:
     """
     Visualize a molecule or periodic structure in the notebook.
@@ -1320,8 +1349,8 @@ def view_molecule(
         Width of the viewer.
     height : str, optional
         Height of the viewer.
-    outline : bool or str, optional
-        Whether to draw outlines around atoms.
+    viewer_outline : bool or str, optional
+        Whether to draw outlines around the viewer.
     fog : bool, optional
         Whether to apply fog effect.
     fog_strength : float, optional
@@ -1341,6 +1370,10 @@ def view_molecule(
     spin_speed : float, optional
         The speed of rotation. Default is 2.0. The rotation is clockwise, if an
         anticlockwise rotation is desired, use a negative value.
+    multi_traj : bool, optional
+        Whether to show trajectory playback controls (play/pause button) for trajectory data (default is True). If False, the play/pause button will be hidden.
+    traj_fps : float, optional
+        Frames per second for playing trajectory animations (default is 10.0).
 
     Returns
     -------
@@ -1382,7 +1415,7 @@ def view_molecule(
         projection=projection,
         width=width,
         height=height,
-        outline=outline,
+        viewer_outline=viewer_outline,
         fog=fog,
         fog_strength=fog_strength,
         draw_outlines=draw_outlines,
@@ -1391,6 +1424,8 @@ def view_molecule(
         spin=spin,
         spin_axis=list(spin_axis),
         spin_speed=spin_speed,
+        multi_traj=multi_traj,
+        traj_fps=traj_fps,
     )
 
     return mo.ui.anywidget(widget)
