@@ -6,12 +6,14 @@ app = marimo.App()
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
+    mo.md(rf"""
+    {mo.outline(label="Outline")}
+
     # marimol
 
     > A python package to visualize molecules and periodic structures in marimo notebooks.
 
-    This package provides a simple API to visualize molecular structures, and can visualize __ase.Atoms__ or __pymatgen.core.Structure__ objects directly. The package allows the user to configure how the amount of information shown in the visualizations, as well as the style in which the structures are drawn.
+    This package provides a simple API to visualize molecular structures, and can visualize __ase.Atoms__ or __pymatgen.core.Structure__ objects out of the box. The package allows the user to configure the amount of information shown in the visualizations, as well as the style in which the structures are drawn. See below for a detailed explanation of its capabilities.
 
     ## Installation
 
@@ -21,13 +23,13 @@ def _(mo):
     pip install marimol
     ```
 
-    ## Usage
+    ## Quick start
 
     To visualize a structure, load the function for the type of data you have:
 
     ```python
     # for the data interface defined by marimol, explained further down in this document
-    from marimol import view_molecule
+    from marimol import view_structure
 
     # for ase.Atoms
     from marimol import view_ase
@@ -46,7 +48,7 @@ def _(mo):
     view_ase(mol)
     ```
 
-    Which will result in the following (you can interact with it! Drag it, spin it, and zoom 😀):
+    Which will result in the following:
     """)
     return
 
@@ -65,13 +67,31 @@ def _():
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Viewer controls
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Viewer arguments
+
+    For
+    """)
+    return
+
+
 @app.cell
 def _():
     import math
 
     import marimo as mo
 
-    from marimol import view_molecule
+    from marimol import view_structure
 
     # A simple mock molecule (e.g. water) animated over 30 frames
     frames_atoms = []
@@ -98,7 +118,7 @@ def _():
         }
         frames_atoms.append(atoms)
 
-    viewer = view_molecule(
+    viewer = view_structure(
         frames_atoms,
         draw_labels=True,
         show_axes=True,
@@ -107,31 +127,23 @@ def _():
         fog_strength=0.5,
         draw_outlines=True,
         measuring_tool=True,
+        trajectory_slider=True,
     )
     return mo, viewer
 
 
 @app.cell
 def _(viewer):
-    viewer.height = "400px"
-    viewer.outline = True
+    viewer.viewer_outline = True
+    viewer.multi_traj = True
+    viewer.traj_fps = 10
     return
 
 
 @app.cell
-def _(mo, text, viewer):
-    mo.vstack([viewer, text])
+def _(viewer):
+    viewer
     return
-
-
-@app.cell
-def _(mo, viewer):
-    # This cell is reactive and will update whenever you click an atom!
-    if viewer.selected_atom_index == -1:
-        text = mo.md("### No atom selected. Click an atom to select it.")
-    else:
-        text = mo.md(f"### Selected Atom Index: **{viewer.selected_atom_index}** in frame {viewer.current_frame}")
-    return (text,)
 
 
 @app.cell
@@ -146,7 +158,7 @@ def _():
         style="wireframe",
         projection="orthographic",
         draw_outlines=True,
-        outline=True,
+        viewer_outline=True,
         draw_labels=True,
         spin=True,
         spin_axis=[1, 1, 1],
@@ -168,6 +180,7 @@ def _(view_ase):
     from ase.build import nanotube
 
     tube = nanotube(6, 0, length=4)
+    tube.info["test"] = 1
     print(tube)
     view_ase(tube, style="vdw", projection="orthographic")
     return (tube,)
@@ -183,6 +196,7 @@ def _(crys, mol, tube, view_ase):
         fog_strength=1,
         draw_outlines=True,
         spin=False,
+        multi_traj=False,
     )
     return
 
