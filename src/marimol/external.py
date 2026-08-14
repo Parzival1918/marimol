@@ -152,8 +152,9 @@ def _convert_cspy_structure(structure: Crystal | Molecule) -> dict:
         positions.extend(molecule.positions.tolist())
         species.extend([e.symbol for e in molecule.elements])
         mol_bonds = molecule.bonds
-        for r, c in mol_bonds.keys():
-            bonds.append({"source": int(r) + initial_indices, "target": int(c) + initial_indices})
+        if mol_bonds is not None:
+            for r, c in mol_bonds.keys():
+                bonds.append({"source": int(r) + initial_indices, "target": int(c) + initial_indices})
         initial_indices += len(molecule.positions)
 
     cell = None
