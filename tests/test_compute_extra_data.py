@@ -27,8 +27,8 @@ def test_compute_extra_data_non_periodic():
     }
 
     extra = compute_extra_data(data)
-    assert extra["number_of_atoms"] == 3
-    assert extra["atomic_weight"] == pytest.approx(15.999 + 2 * 1.008)
+    assert extra["nº atoms"] == 3
+    assert extra["atomic weight"] == pytest.approx(15.999 + 2 * 1.008)
     assert "density" not in extra
     assert "volume" not in extra
     assert "a" not in extra
@@ -43,8 +43,8 @@ def test_compute_extra_data_non_periodic_preserves_existing():
     }
 
     extra = compute_extra_data(data)
-    assert extra["number_of_atoms"] == 1
-    assert extra["atomic_weight"] == pytest.approx(12.011)
+    assert extra["nº atoms"] == 1
+    assert extra["atomic weight"] == pytest.approx(12.011)
     assert extra["user_property"] == 42
 
 
@@ -65,7 +65,7 @@ def test_compute_extra_data_periodic_orthorhombic():
     }
 
     extra = compute_extra_data(data)
-    assert extra["number_of_atoms"] == 2
+    assert extra["nº atoms"] == 2
     assert extra["a"] == pytest.approx(3.0)
     assert extra["b"] == pytest.approx(4.0)
     assert extra["c"] == pytest.approx(5.0)
@@ -74,7 +74,7 @@ def test_compute_extra_data_periodic_orthorhombic():
     # Expected density: (2 * 63.546) / (60.0 * 0.602214076)
     expected_density = (2 * 63.546) / (60.0 * 0.602214076)
     assert extra["density"] == pytest.approx(expected_density)
-    assert "atomic_weight" not in extra
+    assert "atomic weight" not in extra
 
 
 def test_compute_extra_data_periodic_triclinic():
@@ -91,7 +91,7 @@ def test_compute_extra_data_periodic_triclinic():
     }
 
     extra = compute_extra_data(data)
-    assert extra["number_of_atoms"] == 1
+    assert extra["nº atoms"] == 1
     assert extra["a"] == pytest.approx(math.sqrt(2**2 + 1**2))
     assert extra["b"] == pytest.approx(3.0)
     assert extra["c"] == pytest.approx(4.0)
@@ -108,8 +108,8 @@ def test_compute_extra_data_zero_cell():
         "unit_cell": [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]],
     }
     extra = compute_extra_data(data)
-    assert extra["number_of_atoms"] == 2
-    assert extra["atomic_weight"] == pytest.approx(28.014)
+    assert extra["nº atoms"] == 2
+    assert extra["atomic weight"] == pytest.approx(28.014)
     assert "density" not in extra
 
 
@@ -119,7 +119,7 @@ def test_compute_extra_data_case_insensitive_species():
         "species": ["cu", "CL"],
     }
     extra = compute_extra_data(data)
-    assert extra["atomic_weight"] == pytest.approx(63.546 + 35.45)
+    assert extra["atomic weight"] == pytest.approx(63.546 + 35.45)
 
 
 def test_view_structure_compute_extra_data_false():
@@ -139,8 +139,8 @@ def test_view_structure_compute_extra_data_true_single():
     }
     view_structure(data, compute_extra_data=True)
     assert "extra_data" in data
-    assert data["extra_data"]["number_of_atoms"] == 1
-    assert data["extra_data"]["atomic_weight"] == pytest.approx(12.011)
+    assert data["extra_data"]["nº atoms"] == 1
+    assert data["extra_data"]["atomic weight"] == pytest.approx(12.011)
 
 
 def test_view_structure_compute_extra_data_true_trajectory():
@@ -156,10 +156,10 @@ def test_view_structure_compute_extra_data_true_trajectory():
         },
     ]
     view_structure(frames, compute_extra_data=True)
-    assert frames[0]["extra_data"]["number_of_atoms"] == 1
-    assert frames[0]["extra_data"]["atomic_weight"] == pytest.approx(1.008)
+    assert frames[0]["extra_data"]["nº atoms"] == 1
+    assert frames[0]["extra_data"]["atomic weight"] == pytest.approx(1.008)
 
-    assert frames[1]["extra_data"]["number_of_atoms"] == 2
+    assert frames[1]["extra_data"]["nº atoms"] == 2
     assert frames[1]["extra_data"]["volume"] == pytest.approx(8.0)
     assert frames[1]["extra_data"]["a"] == pytest.approx(2.0)
     assert frames[1]["extra_data"]["b"] == pytest.approx(2.0)
@@ -175,13 +175,13 @@ def test_view_ase_with_compute_extra_data():
     widget_mol = view_ase(mol, compute_extra_data=True)
     # Check that widget got data with extra_data
     frame_data = widget_mol.widget.data[0]
-    assert frame_data["extra_data"]["number_of_atoms"] == 3
-    assert frame_data["extra_data"]["atomic_weight"] == pytest.approx(18.015)
+    assert frame_data["extra_data"]["nº atoms"] == 3
+    assert frame_data["extra_data"]["atomic weight"] == pytest.approx(18.015)
 
     crys = bulk("Cu", "fcc", a=3.6)
     widget_crys = view_ase(crys, compute_extra_data=True)
     crys_frame = widget_crys.widget.data[0]
-    assert crys_frame["extra_data"]["number_of_atoms"] == 1
+    assert crys_frame["extra_data"]["nº atoms"] == 1
     assert "density" in crys_frame["extra_data"]
     assert "volume" in crys_frame["extra_data"]
     assert "a" in crys_frame["extra_data"]
@@ -198,7 +198,7 @@ def test_view_pymatgen_with_compute_extra_data():
     structure = Structure(lattice, ["Cs", "Cl"], [[0, 0, 0], [0.5, 0.5, 0.5]])
     widget = view_pymatgen(structure, compute_extra_data=True)
     frame = widget.widget.data[0]
-    assert frame["extra_data"]["number_of_atoms"] == 2
+    assert frame["extra_data"]["nº atoms"] == 2
     assert frame["extra_data"]["volume"] == pytest.approx(27.0)
     assert frame["extra_data"]["a"] == pytest.approx(3.0)
     assert frame["extra_data"]["b"] == pytest.approx(3.0)
