@@ -178,17 +178,19 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             uiContainer.style.left = '15px';
             uiContainer.style.zIndex = '10';
             uiContainer.style.display = 'none'; // hidden by default
+            uiContainer.style.flexWrap = 'wrap';
+            uiContainer.style.maxWidth = 'calc(100% - 70px)';
             uiContainer.style.background = 'rgba(255, 255, 255, 0.7)';
             uiContainer.style.backdropFilter = 'blur(10px)';
             uiContainer.style.WebkitBackdropFilter = 'blur(10px)';
             uiContainer.style.borderRadius = '8px';
-            uiContainer.style.padding = '8px 12px';
+            uiContainer.style.padding = '6px 10px';
             uiContainer.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
             uiContainer.style.fontFamily = 'sans-serif';
             uiContainer.style.fontSize = '14px';
             uiContainer.style.color = '#333';
             uiContainer.style.alignItems = 'center';
-            uiContainer.style.gap = '8px';
+            uiContainer.style.gap = '6px';
 
             const createBtn = (htmlContent, onClick) => {
                 const btn = document.createElement('button');
@@ -230,19 +232,55 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const frames = model.get('data');
                 if (frames && frames.length > 0) setFrame(frames.length - 1);
             });
+
+            const btnGroup = document.createElement('div');
+            btnGroup.style.display = 'flex';
+            btnGroup.style.alignItems = 'center';
+            btnGroup.style.gap = '2px';
+            btnGroup.appendChild(btnFirst);
+            btnGroup.appendChild(btnPrev);
+            btnGroup.appendChild(btnPlay);
+            btnGroup.appendChild(btnNext);
+            btnGroup.appendChild(btnLast);
+
+            const frameSlider = document.createElement('input');
+            frameSlider.type = 'range';
+            frameSlider.min = '0';
+            frameSlider.max = '0';
+            frameSlider.value = '0';
+            frameSlider.step = '1';
+            frameSlider.style.display = model.get('trajectory_slider') ? 'block' : 'none';
+            frameSlider.style.cursor = 'pointer';
+            frameSlider.style.accentColor = '#555';
+            frameSlider.style.flex = '1 1 80px';
+            frameSlider.style.minWidth = '50px';
+            frameSlider.style.maxWidth = '120px';
+            frameSlider.style.width = '100px';
+            frameSlider.style.margin = '0';
+            frameSlider.addEventListener('input', (e) => {
+                setFrame(parseInt(e.target.value, 10));
+            });
+            frameSlider.addEventListener('mousedown', (e) => e.stopPropagation());
+            frameSlider.addEventListener('click', (e) => e.stopPropagation());
+
             const frameCounter = document.createElement('span');
-            frameCounter.style.marginLeft = '8px';
-            frameCounter.style.minWidth = '50px';
+            frameCounter.style.minWidth = '45px';
             frameCounter.style.textAlign = 'center';
             frameCounter.style.fontWeight = '500';
+            frameCounter.style.fontSize = '13px';
+            frameCounter.style.whiteSpace = 'nowrap';
             frameCounter.innerText = '1 / 1';
 
-            uiContainer.appendChild(btnFirst);
-            uiContainer.appendChild(btnPrev);
-            uiContainer.appendChild(btnPlay);
-            uiContainer.appendChild(btnNext);
-            uiContainer.appendChild(btnLast);
-            uiContainer.appendChild(frameCounter);
+            const sliderGroup = document.createElement('div');
+            sliderGroup.style.display = 'flex';
+            sliderGroup.style.alignItems = 'center';
+            sliderGroup.style.gap = '6px';
+            sliderGroup.style.flex = '1 1 auto';
+            sliderGroup.appendChild(frameSlider);
+            sliderGroup.appendChild(frameCounter);
+
+            uiContainer.appendChild(btnGroup);
+            uiContainer.appendChild(sliderGroup);
             container.appendChild(uiContainer);
 
             // --- Right Side UI (Container for Measure, Extra Data, Info Panel) ---
@@ -576,6 +614,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (idx >= frames.length) idx = 0;
                 model.set('current_frame', idx);
                 model.save_changes();
+                frameSlider.value = String(idx);
                 updateScene();
             }
 
@@ -591,6 +630,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     btnPlay.style.display = model.get('multi_traj') !== false ? 'flex' : 'none';
                     const cFrame = model.get('current_frame');
                     frameCounter.innerText = `${cFrame + 1} / ${frames.length}`;
+                    frameSlider.max = String(Math.max(0, frames.length - 1));
+                    frameSlider.value = String(cFrame);
+                    frameSlider.style.display = model.get('trajectory_slider') ? 'block' : 'none';
 
                     const fData = frames[cFrame] || {};
                     positions = fData.positions || [];
@@ -992,6 +1034,11 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     togglePlay();
                 }
             });
+            model.on("change:trajectory_slider", () => {
+                const frames = model.get('data') || [];
+                const isTrajectory = frames.length > 1;
+                frameSlider.style.display = (model.get('trajectory_slider') && isTrajectory) ? 'block' : 'none';
+            });
             model.on("change:traj_fps", () => {
                 if (isPlaying) {
                     if (animationInterval) clearInterval(animationInterval);
@@ -1280,6 +1327,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     spin_speed = traitlets.Float(2.0).tag(sync=True)
     multi_traj = traitlets.Bool(True).tag(sync=True)
     traj_fps = traitlets.Float(10.0).tag(sync=True)
+    trajectory_slider = traitlets.Bool(False).tag(sync=True)
 
 
 STYLES = {
@@ -1327,6 +1375,7 @@ def view_structure(
     spin_speed: float = 2.0,
     multi_traj: bool = True,
     traj_fps: float = 10.0,
+    trajectory_slider: bool = False,
 ) -> mo.ui.anywidget:
     """
     Visualize a molecule or periodic structure in the notebook.
@@ -1374,6 +1423,8 @@ def view_structure(
         Whether to show trajectory playback controls (play/pause button) for trajectory data (default is True). If False, the play/pause button will be hidden.
     traj_fps : float, optional
         Frames per second for playing trajectory animations (default is 10.0).
+    trajectory_slider : bool, optional
+        Whether to show a frame slider for trajectory data (default is False).
 
     Returns
     -------
@@ -1426,6 +1477,7 @@ def view_structure(
         spin_speed=spin_speed,
         multi_traj=multi_traj,
         traj_fps=traj_fps,
+        trajectory_slider=trajectory_slider,
     )
 
     return mo.ui.anywidget(widget)
