@@ -4,7 +4,7 @@ import marimo as mo
 
 from .viewer import view_structure
 
-__all__ = ["view_ase", "view_pymatgen"]
+__all__ = ["view_ase", "view_pymatgen", "view_cspy"]
 
 
 try:

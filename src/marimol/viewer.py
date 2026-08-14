@@ -144,10 +144,19 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             });
 
             const outlineMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                side: THREE.BackSide,
+                depthWrite: true
+            });
+
+            const bondOutlineMaterial = new THREE.MeshBasicMaterial({
                 color: 0x000000,
                 side: THREE.BackSide,
                 depthWrite: true
             });
+
+            const selectedOutlineColor = new THREE.Color(0x00f0ff);
+            const defaultOutlineColor = new THREE.Color(0x000000);
 
             let atomMesh = null; // InstancedMesh for atoms
             let bondMesh = null; // InstancedMesh for bonds
@@ -159,6 +168,12 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             const raycaster = new THREE.Raycaster();
             const mouse = new THREE.Vector2();
             const yAxis = new THREE.Vector3(0, 1, 0);
+
+            let currentPositions = [];
+            let currentSpecies = [];
+            let currentNumAtoms = 0;
+            let currentStyle = {};
+            let currentGetRadius = (sp) => 0.8;
 
             // --- Atom Labels Overlay ---
             const labelsContainer = document.createElement('div');
@@ -563,11 +578,12 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             });
 
             function updateInfoPanel() {
-                const idx = model.get('selected_atom_index');
-                if (idx < 0) {
+                const selectedAtoms = model.get('selected_atoms') || [];
+                if (selectedAtoms.length !== 1) {
                     infoPanel.style.display = 'none';
                     return;
                 }
+                const idx = selectedAtoms[0];
                 const cFrame = model.get('current_frame');
                 const frames = model.get('data') || [];
                 let positions = [];
@@ -577,7 +593,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     species_list = frames[cFrame].species || [];
                 }
 
-                if (idx >= positions.length) {
+                if (idx < 0 || idx >= positions.length) {
                     infoPanel.style.display = 'none';
                     return;
                 }
@@ -588,8 +604,84 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 infoPanel.innerText = `Index:   ${idx}\nSpecies: ${species}\nPos:     [${pos[0].toFixed(3)}, ${pos[1].toFixed(3)}, ${pos[2].toFixed(3)}]`;
                 infoPanel.style.display = 'block';
             }
-            model.on("change:selected_atom_index", updateInfoPanel);
-            model.on("change:current_frame", updateInfoPanel);
+
+            function updateSelectionVisuals() {
+                if (!atomOutlineMesh || currentNumAtoms === 0) return;
+
+                const selectedAtoms = model.get('selected_atoms') || [];
+                const drawOutlines = model.get('draw_outlines');
+                const hasSelection = selectedAtoms.length > 0;
+
+                const atomicRadiusScaler = currentStyle.atomic_radius_scaler !== undefined ? currentStyle.atomic_radius_scaler : 1.0;
+                const fixedAtomicRadius = currentStyle.fixed_atomic_radius !== undefined ? currentStyle.fixed_atomic_radius : null;
+                const hydrogenAtomRadius = currentStyle.hydrogen_atom_radius !== undefined ? currentStyle.hydrogen_atom_radius : null;
+
+                for (let i = 0; i < currentNumAtoms; i++) {
+                    const pos = currentPositions[i] || [0, 0, 0];
+                    const sp = currentSpecies[i] !== undefined ? currentSpecies[i] : '?';
+                    let rad = currentGetRadius(sp);
+
+                    if ((sp === 1 || sp === 'H' || sp === 'h') && hydrogenAtomRadius != null) {
+                        rad = hydrogenAtomRadius;
+                    } else if (fixedAtomicRadius != null) {
+                        rad = fixedAtomicRadius;
+                    } else if (atomicRadiusScaler != null) {
+                        rad = rad * atomicRadiusScaler;
+                    }
+
+                    const isSelected = selectedAtoms.includes(i);
+                    dummy.position.set(pos[0], pos[1], pos[2]);
+                    dummy.quaternion.identity();
+
+                    if (drawOutlines) {
+                        const outlineThickness = isSelected ? Math.max(0.04, Math.min(0.06, rad * 0.25)) : Math.min(0.04, rad * 0.2);
+                        dummy.scale.set(rad + outlineThickness, rad + outlineThickness, rad + outlineThickness);
+                        dummy.updateMatrix();
+                        atomOutlineMesh.setMatrixAt(i, dummy.matrix);
+                        atomOutlineMesh.setColorAt(i, isSelected ? selectedOutlineColor : defaultOutlineColor);
+                    } else {
+                        if (isSelected) {
+                            const outlineThickness = Math.max(0.04, Math.min(0.06, rad * 0.25));
+                            dummy.scale.set(rad + outlineThickness, rad + outlineThickness, rad + outlineThickness);
+                            dummy.updateMatrix();
+                            atomOutlineMesh.setMatrixAt(i, dummy.matrix);
+                            atomOutlineMesh.setColorAt(i, selectedOutlineColor);
+                        } else {
+                            dummy.scale.set(0, 0, 0);
+                            dummy.updateMatrix();
+                            atomOutlineMesh.setMatrixAt(i, dummy.matrix);
+                            atomOutlineMesh.setColorAt(i, defaultOutlineColor);
+                        }
+                    }
+                }
+
+                atomOutlineMesh.instanceMatrix.needsUpdate = true;
+                if (atomOutlineMesh.instanceColor) atomOutlineMesh.instanceColor.needsUpdate = true;
+
+                if (drawOutlines || hasSelection) {
+                    if (atomOutlineMesh.parent !== scene) {
+                        scene.add(atomOutlineMesh);
+                    }
+                } else {
+                    if (atomOutlineMesh.parent === scene) {
+                        scene.remove(atomOutlineMesh);
+                    }
+                }
+            }
+
+            model.on("change:selected_atoms", () => {
+                updateSelectionVisuals();
+                updateInfoPanel();
+            });
+            model.on("change:current_frame", () => {
+                const selected = model.get('selected_atoms') || [];
+                if (selected.length > 0) {
+                    model.set('selected_atoms', []);
+                    model.save_changes();
+                }
+                updateSelectionVisuals();
+                updateInfoPanel();
+            });
 
             function togglePlay() {
                 isPlaying = !isPlaying;
@@ -615,6 +707,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (idx < 0) idx = frames.length - 1;
                 if (idx >= frames.length) idx = 0;
                 model.set('current_frame', idx);
+                model.set('selected_atoms', []);
                 model.save_changes();
                 frameSlider.value = String(idx);
                 updateScene();
@@ -725,6 +818,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
                 // Determine styling parameters
                 let showBonds = bondRadius > 0 && bonds.length > 0;
+                const drawOutlines = model.get('draw_outlines');
 
                 // --- ATOM LABELS ---
                 labelsContainer.innerHTML = '';
@@ -758,13 +852,17 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     }
                 }
 
+                // Store current state for dynamic selection updates
+                currentPositions = positions;
+                currentSpecies = species;
+                currentNumAtoms = numAtoms;
+                currentStyle = style;
+                currentGetRadius = getRadius;
+
                 // --- ATOMS ---
-                const drawOutlines = model.get('draw_outlines');
                 atomMesh = new THREE.InstancedMesh(sphereGeometry, sphereMaterial, numAtoms);
-                if (drawOutlines) {
-                    atomOutlineMesh = new THREE.InstancedMesh(sphereGeometry, outlineMaterial, numAtoms);
-                    atomOutlineMesh.renderOrder = 1;
-                }
+                atomOutlineMesh = new THREE.InstancedMesh(sphereGeometry, outlineMaterial, numAtoms);
+                atomOutlineMesh.renderOrder = 1;
                 let centerSum = new THREE.Vector3(0, 0, 0);
 
                 for (let i = 0; i < numAtoms; i++) {
@@ -788,13 +886,6 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     dummy.updateMatrix();
                     atomMesh.setMatrixAt(i, dummy.matrix);
 
-                    if (drawOutlines) {
-                        const outlineThickness = Math.min(0.04, rad * 0.2);
-                        dummy.scale.set(rad + outlineThickness, rad + outlineThickness, rad + outlineThickness);
-                        dummy.updateMatrix();
-                        atomOutlineMesh.setMatrixAt(i, dummy.matrix);
-                    }
-
                     if (customHighlight && customHighlight.includes(i)) {
                         colorObj.setRGB(0, 1, 1);
                     } else {
@@ -808,17 +899,15 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 atomMesh.instanceMatrix.needsUpdate = true;
                 if (atomMesh.instanceColor) atomMesh.instanceColor.needsUpdate = true;
                 scene.add(atomMesh);
-                if (drawOutlines) {
-                    atomOutlineMesh.instanceMatrix.needsUpdate = true;
-                    scene.add(atomOutlineMesh);
-                }
 
+                updateSelectionVisuals();
+                updateInfoPanel();
 
                 // --- BONDS ---
                 if (showBonds && bonds.length > 0) {
                     bondMesh = new THREE.InstancedMesh(cylinderGeometry, cylinderMaterial, bonds.length * 2);
                     if (drawOutlines) {
-                        bondOutlineMesh = new THREE.InstancedMesh(cylinderGeometry, outlineMaterial, bonds.length);
+                        bondOutlineMesh = new THREE.InstancedMesh(cylinderGeometry, bondOutlineMaterial, bonds.length);
                         bondOutlineMesh.renderOrder = 1;
                     }
 
@@ -1137,7 +1226,16 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             resizeObserver.observe(container);
 
             // Handle Click (Picking or Axis Snapping)
+            let pointerDownPos = { x: 0, y: 0 };
+            container.addEventListener('pointerdown', (e) => {
+                pointerDownPos = { x: e.clientX, y: e.clientY };
+            });
+
             container.addEventListener('click', (event) => {
+                const dx = event.clientX - pointerDownPos.x;
+                const dy = event.clientY - pointerDownPos.y;
+                if (Math.sqrt(dx * dx + dy * dy) > 5) return;
+
                 const rect = container.getBoundingClientRect();
                 const cx = event.clientX - rect.left;
                 const cy = event.clientY - rect.top;
@@ -1195,16 +1293,32 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                             measureSelection.push({ index: instanceId, pos: pos });
                             updateMeasurementUI();
                         } else {
-                            model.set("selected_atom_index", instanceId);
+                            let currentSelected = [...(model.get('selected_atoms') || [])];
+                            if (event.shiftKey) {
+                                if (currentSelected.includes(instanceId)) {
+                                    currentSelected = currentSelected.filter(id => id !== instanceId);
+                                } else {
+                                    currentSelected.push(instanceId);
+                                }
+                            } else {
+                                currentSelected = [instanceId];
+                            }
+                            model.set("selected_atoms", currentSelected);
                             model.save_changes();
+                            updateSelectionVisuals();
+                            updateInfoPanel();
                         }
                     } else {
                         if (isMeasuring) {
                             measureSelection = [];
                             updateMeasurementUI();
                         } else {
-                            model.set("selected_atom_index", -1);
-                            model.save_changes();
+                            if (!event.shiftKey) {
+                                model.set("selected_atoms", []);
+                                model.save_changes();
+                                updateSelectionVisuals();
+                                updateInfoPanel();
+                            }
                         }
                     }
                 }
@@ -1299,6 +1413,18 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     atomMesh.dispose();
                     scene.remove(atomMesh);
                 }
+                if (atomOutlineMesh) {
+                    atomOutlineMesh.dispose();
+                    scene.remove(atomOutlineMesh);
+                }
+                if (bondMesh) {
+                    bondMesh.dispose();
+                    scene.remove(bondMesh);
+                }
+                if (bondOutlineMesh) {
+                    bondOutlineMesh.dispose();
+                    scene.remove(bondOutlineMesh);
+                }
                 renderer.dispose();
             };
         }
@@ -1311,7 +1437,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     default_radius = traitlets.Float().tag(sync=True)
 
     current_frame = traitlets.Int(0).tag(sync=True)
-    selected_atom_index = traitlets.Int(-1).tag(sync=True)
+    selected_atoms = traitlets.List(default_value=[]).tag(sync=True)
     background_color = traitlets.Unicode("#ffffff").tag(sync=True)
     style = traitlets.Dict().tag(sync=True)
     show_axes = traitlets.Bool(False).tag(sync=True)

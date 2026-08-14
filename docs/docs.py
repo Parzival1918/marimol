@@ -143,6 +143,12 @@ def _(viewer):
 
 
 @app.cell
+def _(viewer):
+    viewer.selected_atoms, viewer.current_frame
+    return
+
+
+@app.cell
 def _():
     from ase.build import molecule
 
