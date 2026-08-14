@@ -590,7 +590,7 @@ def _():
 
     ### 2. Set up the development environment & pre-commit hooks
 
-    We use [uv](https://github.com/astral-sh/uv) for fast, reproducible dependency management. Install dependencies with all optional extras and dev tools:
+    We use [uv](https://github.com/astral-sh/uv) for fast, reproducible dependency management and [just](https://github.com/casey/just) for task automation. Install dependencies with all optional extras and dev tools:
 
     ```bash
     # Install dependencies with all optional extras and dev tools
@@ -600,22 +600,22 @@ def _():
     To keep code formatting and linting consistent across the codebase, **pre-commit hooks must be installed**:
 
     ```bash
-    # Install Git hook shims
-    uv run prek install
+    # Install Git hook shims via just or prek
+    uv run just install-hooks
     ```
 
     Once installed, automated checks (such as [Ruff](https://astral.sh/ruff) formatting and linting, trailing whitespace trimming, and YAML validation) will run automatically before every commit.
 
     ### 3. Code style and formatting
 
-    This project uses [Ruff](https://astral.sh/ruff) for linting and formatting. You can also run checks manually at any time:
+    This project uses [Ruff](https://astral.sh/ruff) for linting and formatting. You can run checks manually at any time:
 
     ```bash
     # Run linter
-    uv run ruff check
+    uv run just lint
 
     # Format code
-    uv run ruff format
+    uv run just format
     ```
 
     ### 4. Running tests
@@ -623,7 +623,7 @@ def _():
     Execute the test suite using `pytest`:
 
     ```bash
-    uv run pytest
+    uv run just test
     ```
 
     ### 5. Previewing documentation
@@ -631,13 +631,13 @@ def _():
     To launch and edit the interactive documentation notebook locally:
 
     ```bash
-    uv run marimo edit docs/docs.py
+    uv run just docs-edit
     ```
 
     To test exporting the documentation to HTML:
 
     ```bash
-    uv run marimo export html docs/docs.py -o docs/index.html --no-include-code
+    uv run just docs-build
     ```
 
     ### 6. Submitting a Pull Request
