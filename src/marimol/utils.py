@@ -397,6 +397,9 @@ def compute_extra_data(data: dict) -> dict:
         - a: length of the 'a' cell vector in Å
         - b: length of the 'b' cell vector in Å
         - c: length of the 'c' cell vector in Å
+        - alpha: angle between 'b' and 'c' cell vectors in degrees
+        - beta: angle between 'a' and 'c' cell vectors in degrees
+        - gamma: angle between 'a' and 'b' cell vectors in degrees
 
     Parameters
     ----------
@@ -437,6 +440,9 @@ def compute_extra_data(data: dict) -> dict:
         a_len = float(np.linalg.norm(cell_arr[0]))
         b_len = float(np.linalg.norm(cell_arr[1]))
         c_len = float(np.linalg.norm(cell_arr[2]))
+        alpha = np.arccos(np.dot(cell_arr[1], cell_arr[2]) / (b_len * c_len)) * 180 / np.pi
+        beta = np.arccos(np.dot(cell_arr[0], cell_arr[2]) / (a_len * c_len)) * 180 / np.pi
+        gamma = np.arccos(np.dot(cell_arr[0], cell_arr[1]) / (a_len * b_len)) * 180 / np.pi
         volume = float(abs(np.linalg.det(cell_arr)))
         # Density in g/cm³: (mass_g_per_mol) / (volume_A3 * N_A * 1e-24)
         # N_A * 1e-24 = 0.602214076
@@ -448,6 +454,9 @@ def compute_extra_data(data: dict) -> dict:
         data["extra_data"]["a"] = a_len
         data["extra_data"]["b"] = b_len
         data["extra_data"]["c"] = c_len
+        data["extra_data"]["alpha"] = alpha
+        data["extra_data"]["beta"] = beta
+        data["extra_data"]["gamma"] = gamma
     else:
         data["extra_data"]["nº atoms"] = int(num_atoms)
         data["extra_data"]["atomic weight"] = total_atomic_weight

@@ -160,7 +160,7 @@ def _():
         spin_axis=[1, 1, 1],
         compute_extra_data=True
     )
-    return mol, view_ase
+    return mol, molecule, view_ase
 
 
 @app.cell
@@ -196,6 +196,42 @@ def _(crys, mol, tube, view_ase):
         multi_traj=False,
         compute_extra_data=True
     )
+    return
+
+
+@app.cell
+def _(molecule):
+    from cspy import Crystal, Molecule
+    from cspy.crystal.generate_crystal import CrystalGenerator
+    from marimol.external import view_cspy
+
+    _mol = molecule("CH4")
+    cspy_mol = Molecule.from_xyz_string("""5
+    methane
+    C 2.629 2.629 2.629
+    H 2.0 3.258 2.0
+    H 3.258 3.258 3.258
+    H 2.0 2.0 3.258
+    H 3.258 2.0 2.0
+    """)
+    generator = CrystalGenerator([cspy_mol, cspy_mol], 2)
+    cspy_crystals = []
+    for _seed in range(1, 11):
+        _c = generator.generate(_seed)
+        if _c is not None:
+            cspy_crystals.append(_c)
+
+    cspy_mol.guess_bonds()
+    print(cspy_mol.bonds)
+    initial_indices=0
+    for r, c in cspy_mol.bonds.keys():
+        if r > c: continue
+        print(r, c)
+
+    _crys = cspy_crystals[0]
+    _crys.unit_cell.lattice.tolist()
+
+    view_cspy(cspy_crystals, compute_extra_data=True)
     return
 
 

@@ -127,3 +127,60 @@ def view_pymatgen(structure: Structure | list[Structure], **kwargs) -> mo.ui.any
         return view_structure(data, **kwargs)
     else:
         return view_structure(_convert_pmg_structure(structure), **kwargs)
+
+
+try:
+    from cspy import Crystal, Molecule
+
+    CSPY = True
+except ImportError:
+    CSPY = False
+
+
+def _convert_cspy_structure(structure: Crystal | Molecule) -> dict:
+    if isinstance(structure, Crystal):
+        structure = structure.as_P1()
+        molecules = structure.asym_mols()
+    else:
+        molecules = [structure]
+
+    positions = []
+    species = []
+    bonds = []  # list of {"source": int, "target": int}
+    initial_indices = 0
+    for molecule in molecules:
+        positions.extend(molecule.positions.tolist())
+        species.extend([e.symbol for e in molecule.elements])
+        mol_bonds = molecule.bonds
+        for r, c in mol_bonds.keys():
+            bonds.append({"source": int(r) + initial_indices, "target": int(c) + initial_indices})
+        initial_indices += len(molecule.positions)
+
+    cell = None
+    if isinstance(structure, Crystal):
+        cell = structure.unit_cell.lattice.tolist()
+
+    return {"positions": positions, "species": species, "bonds": bonds, "unit_cell": cell}
+
+
+def view_cspy(structure: Crystal | Molecule | list[Crystal | Molecule], **kwargs) -> mo.ui.anywidget:
+    """
+    Visualize Cspy Crystal or Molecule or list of Crystal or Molecule objects.
+
+    Parameters
+    ----------
+    structure : Crystal | Molecule | list[Crystal | Molecule]
+        Cspy Crystal or Molecule object or list of Cspy Crystal or Molecule objects to visualize.
+    **kwargs
+        Additional keyword arguments to pass to :func:`~marimol.viewer.view_structure`.
+    """
+    if not CSPY:
+        raise ImportError("mol-cspy is not installed. Please install it to use this function.")
+
+    if isinstance(structure, list):
+        data = []
+        for frag in structure:
+            data.append(_convert_cspy_structure(frag))
+        return view_structure(data, **kwargs)
+    else:
+        return view_structure(_convert_cspy_structure(structure), **kwargs)
