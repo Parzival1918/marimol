@@ -108,12 +108,7 @@ def _():
             "labels": ["A", "B", ""],
             "highlight": [1],
             "extra_data": {
-                "energy": -10 * f,
-                "density": 1.4,
-                "energy2": -10 * f,
-                "density2": 1.4,
-                "energy3": -10 * f,
-                "density3": 1.4,
+                "name": f"Frame {f}"
             },
         }
         frames_atoms.append(atoms)
@@ -128,6 +123,7 @@ def _():
         draw_outlines=True,
         measuring_tool=True,
         trajectory_slider=True,
+        compute_extra_data=True
     )
     return mo, viewer
 
@@ -162,6 +158,7 @@ def _():
         draw_labels=True,
         spin=True,
         spin_axis=[1, 1, 1],
+        compute_extra_data=True
     )
     return mol, view_ase
 
@@ -197,6 +194,7 @@ def _(crys, mol, tube, view_ase):
         draw_outlines=True,
         spin=False,
         multi_traj=False,
+        compute_extra_data=True
     )
     return
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import anywidget
 import marimo as mo
 import traitlets
@@ -1376,6 +1378,7 @@ def view_structure(
     multi_traj: bool = True,
     traj_fps: float = 10.0,
     trajectory_slider: bool = False,
+    compute_extra_data: bool = False,
 ) -> mo.ui.anywidget:
     """
     Visualize a molecule or periodic structure in the notebook.
@@ -1425,6 +1428,9 @@ def view_structure(
         Frames per second for playing trajectory animations (default is 10.0).
     trajectory_slider : bool, optional
         Whether to show a frame slider for trajectory data (default is False).
+    compute_extra_data : bool, optional
+        Whether to compute and display extra data (number of atoms, atomic weight for non-periodic;
+        density, volume, number of atoms, and cell vector lengths for periodic structures). Default is False.
 
     Returns
     -------
@@ -1436,6 +1442,12 @@ def view_structure(
 
     is_trajectory = isinstance(data, list)
     frames_data = data if is_trajectory else [data]
+
+    if compute_extra_data:
+        from .utils import compute_extra_data as compute_extra_data_func
+
+        for f in frames_data:
+            compute_extra_data_func(f)
 
     if unwrap_molecules:
         from .utils import unwrap_molecules as unwrap_molecules_func

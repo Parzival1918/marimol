@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 
 import numpy as np
@@ -80,6 +82,128 @@ VDW_RADII = {
     "Cu": 1.40,
     "Ag": 1.72,
     "Au": 1.66,
+}
+
+# Standard atomic weights (in g/mol) for elements 1 to 118
+ATOMIC_WEIGHTS = {
+    "H": 1.008,
+    "He": 4.0026,
+    "Li": 6.94,
+    "Be": 9.0122,
+    "B": 10.81,
+    "C": 12.011,
+    "N": 14.007,
+    "O": 15.999,
+    "F": 18.9984,
+    "Ne": 20.180,
+    "Na": 22.9898,
+    "Mg": 24.305,
+    "Al": 26.9815,
+    "Si": 28.085,
+    "P": 30.9738,
+    "S": 32.06,
+    "Cl": 35.45,
+    "Ar": 39.948,
+    "K": 39.0983,
+    "Ca": 40.078,
+    "Sc": 44.9559,
+    "Ti": 47.867,
+    "V": 50.9415,
+    "Cr": 51.9961,
+    "Mn": 54.938,
+    "Fe": 55.845,
+    "Co": 58.9332,
+    "Ni": 58.6934,
+    "Cu": 63.546,
+    "Zn": 65.38,
+    "Ga": 69.723,
+    "Ge": 72.630,
+    "As": 74.9216,
+    "Se": 78.971,
+    "Br": 79.904,
+    "Kr": 83.798,
+    "Rb": 85.4678,
+    "Sr": 87.62,
+    "Y": 88.9058,
+    "Zr": 91.224,
+    "Nb": 92.9064,
+    "Mo": 95.95,
+    "Tc": 98.0,
+    "Ru": 101.07,
+    "Rh": 102.9055,
+    "Pd": 106.42,
+    "Ag": 107.8682,
+    "Cd": 112.414,
+    "In": 114.818,
+    "Sn": 118.710,
+    "Sb": 121.760,
+    "Te": 127.60,
+    "I": 126.9045,
+    "Xe": 131.293,
+    "Cs": 132.9055,
+    "Ba": 137.327,
+    "La": 138.9055,
+    "Ce": 140.116,
+    "Pr": 140.9077,
+    "Nd": 144.242,
+    "Pm": 145.0,
+    "Sm": 150.36,
+    "Eu": 151.964,
+    "Gd": 157.25,
+    "Tb": 158.9254,
+    "Dy": 162.500,
+    "Ho": 164.9303,
+    "Er": 167.259,
+    "Tm": 168.9342,
+    "Yb": 173.045,
+    "Lu": 174.9668,
+    "Hf": 178.49,
+    "Ta": 180.9479,
+    "W": 183.84,
+    "Re": 186.207,
+    "Os": 190.23,
+    "Ir": 192.217,
+    "Pt": 195.084,
+    "Au": 196.9666,
+    "Hg": 200.592,
+    "Tl": 204.38,
+    "Pb": 207.2,
+    "Bi": 208.9804,
+    "Po": 209.0,
+    "At": 210.0,
+    "Rn": 222.0,
+    "Fr": 223.0,
+    "Ra": 226.0,
+    "Ac": 227.0,
+    "Th": 232.0377,
+    "Pa": 231.0359,
+    "U": 238.0289,
+    "Np": 237.0,
+    "Pu": 244.0,
+    "Am": 243.0,
+    "Cm": 247.0,
+    "Bk": 247.0,
+    "Cf": 251.0,
+    "Es": 252.0,
+    "Fm": 257.0,
+    "Md": 258.0,
+    "No": 259.0,
+    "Lr": 262.0,
+    "Rf": 267.0,
+    "Db": 270.0,
+    "Sg": 271.0,
+    "Bh": 270.0,
+    "Hs": 277.0,
+    "Mt": 276.0,
+    "Ds": 281.0,
+    "Rg": 282.0,
+    "Cn": 285.0,
+    "Nh": 286.0,
+    "Fl": 289.0,
+    "Mc": 290.0,
+    "Lv": 293.0,
+    "Ts": 294.0,
+    "Og": 294.0,
 }
 
 DEFAULT_RADIUS = 0.8
@@ -256,3 +380,76 @@ def unwrap_molecules(data: dict) -> dict:
 
     new_data["positions"] = new_positions.tolist()
     return new_data
+
+
+def compute_extra_data(data: dict) -> dict:
+    """
+    Compute extra data for a structure and add it to its 'extra_data' dictionary.
+
+    For non-periodic structures:
+        - number_of_atoms: total number of atoms
+        - atomic_weight: total atomic weight in g/mol
+
+    For periodic structures:
+        - density: density in g/cm³
+        - volume: unit cell volume in Å³
+        - number_of_atoms: total number of atoms in the unit cell
+        - a: length of the 'a' cell vector in Å
+        - b: length of the 'b' cell vector in Å
+        - c: length of the 'c' cell vector in Å
+
+    Parameters
+    ----------
+    data : dict
+        A structure dictionary with 'species', 'positions', and optional 'unit_cell'.
+
+    Returns
+    -------
+    dict
+        The updated 'extra_data' dictionary of the structure.
+    """
+    if not isinstance(data, dict):
+        return {}
+
+    if "extra_data" not in data or data["extra_data"] is None or not isinstance(data["extra_data"], dict):
+        data["extra_data"] = {}
+
+    species = data.get("species", [])
+    positions = data.get("positions", [])
+    unit_cell = data.get("unit_cell")
+
+    num_atoms = len(positions) if positions else len(species)
+    total_atomic_weight = float(sum(ATOMIC_WEIGHTS.get(str(s).strip().capitalize(), 0.0) for s in species))
+
+    is_periodic = False
+    cell_arr = None
+    if unit_cell:
+        try:
+            cell_arr = np.array(unit_cell, dtype=float)
+            if cell_arr.shape == (3, 3):
+                vol = float(abs(np.linalg.det(cell_arr)))
+                if vol > 1e-6:
+                    is_periodic = True
+        except (ValueError, TypeError, np.linalg.LinAlgError):
+            is_periodic = False
+
+    if is_periodic and cell_arr is not None:
+        a_len = float(np.linalg.norm(cell_arr[0]))
+        b_len = float(np.linalg.norm(cell_arr[1]))
+        c_len = float(np.linalg.norm(cell_arr[2]))
+        volume = float(abs(np.linalg.det(cell_arr)))
+        # Density in g/cm³: (mass_g_per_mol) / (volume_A3 * N_A * 1e-24)
+        # N_A * 1e-24 = 0.602214076
+        density = float(total_atomic_weight / (volume * 0.602214076)) if volume > 0 else 0.0
+
+        data["extra_data"]["density"] = density
+        data["extra_data"]["volume"] = volume
+        data["extra_data"]["nº atoms"] = int(num_atoms)
+        data["extra_data"]["a"] = a_len
+        data["extra_data"]["b"] = b_len
+        data["extra_data"]["c"] = c_len
+    else:
+        data["extra_data"]["nº atoms"] = int(num_atoms)
+        data["extra_data"]["atomic weight"] = total_atomic_weight
+
+    return data["extra_data"]
