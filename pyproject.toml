@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 dependencies = [
     "anywidget>=0.11.0",
     "marimo>=0.23.16",
-    "numpy>=2",
+    "numpy>=1.24.1,<2.0.0",
     "traitlets>=5.16.1",
 ]
 
@@ -19,6 +19,7 @@ dependencies = [
 external = [
     "ase",
     "pymatgen",
+    "cspy",
 ]
 all = [
     "marimol[external]",
@@ -33,6 +34,9 @@ dev = [
     "prek>=0.4.12",
     "ruff>=0.16.2",
 ]
+
+[tool.uv.sources]
+cspy = { git = "https://gitlab.com/mol-cspy/mol-cspy", branch = "main" }
 
 [tool.ruff]
 line-length = 120
