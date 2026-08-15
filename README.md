@@ -152,6 +152,7 @@ All viewer functions (`view_structure`, `view_ase`, `view_pymatgen`, `view_cspy`
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `data` / `atoms` / `structure` | `dict` \| `list[dict]` | *Required* | Structure dictionary, list of dictionaries, or external library structure object. |
+| `config` | `dict` \| `str` \| `PathLike` | `None` | Configuration dictionary, TOML string, or path to a `.toml` file. Explicit arguments will overwrite config settings. |
 | `style` | `str` \| `dict` | `"ball-and-stick"` | Representation style: `"ball-and-stick"`, `"vdw"`, `"wireframe"`, or custom `dict`. |
 | `background_color` | `str` | `"white"` | Viewport background color (e.g. `"white"`, `"black"`, `"#1e1e1e"`, `"transparent"`). |
 | `show_axes` | `bool` | `False` | Display interactive XYZ coordinate triad in the bottom-left corner. |
@@ -177,6 +178,28 @@ All viewer functions (`view_structure`, `view_ase`, `view_pymatgen`, `view_cspy`
 | `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. |
 | `record_include_bgd` | `bool` | `False` | Include the background color in exported screenshots and video recordings (default is `False` for transparent backgrounds). |
 | `record_include_ui` | `bool` | `False` | Include all viewer UI elements (playback controls, info panel, measurements, labels) in exported screenshots and video recordings. |
+
+---
+
+### Configuration Presets (TOML / Dict)
+
+You can maintain reusable visual presets across your notebooks using TOML strings, `.toml` files, or dictionaries:
+
+```python
+toml_config = """
+style = "ball-and-stick"
+background_color = "#0f172a"
+show_axes = true
+spin = true
+spin_speed = 1.5
+measuring_tool = true
+recording_tools = true
+record_include_bgd = true
+"""
+
+# Explicit arguments take precedence and overwrite config values
+view_structure(data, config=toml_config, background_color="#1e293b")
+```
 
 ---
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import os
+import tomllib
 
 import numpy as np
 
@@ -462,3 +464,39 @@ def compute_extra_data(data: dict) -> dict:
         data["extra_data"]["atomic weight"] = total_atomic_weight
 
     return data["extra_data"]
+
+
+def parse_toml_config(config: dict | str | os.PathLike) -> dict:
+    """
+    Parse a TOML configuration from a dictionary, a file path (PathLike or str), or a TOML formatted string.
+
+    Parameters
+    ----------
+    config : dict, str, or os.PathLike
+        A dictionary of configuration settings, a path to a TOML file, or a TOML formatted string.
+
+    Returns
+    -------
+    dict
+        Parsed configuration dictionary.
+    """
+    if isinstance(config, dict):
+        return dict(config)
+
+    if isinstance(config, os.PathLike):
+        with open(config, "rb") as f:
+            return tomllib.load(f)
+
+    if isinstance(config, str):
+        try:
+            is_file = os.path.isfile(config)
+        except (ValueError, OSError):
+            is_file = False
+
+        if is_file:
+            with open(config, "rb") as f:
+                return tomllib.load(f)
+        else:
+            return tomllib.loads(config)
+
+    raise TypeError(f"Expected dict, str, or os.PathLike for config, got {type(config).__name__}")

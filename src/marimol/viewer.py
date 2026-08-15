@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import anywidget
 import marimo as mo
 import traitlets
@@ -11,6 +13,7 @@ from .utils import (
     DEFAULT_RADIUS,
     DEFAULT_VDW_RADIUS,
     VDW_RADII,
+    parse_toml_config,
     resolve_color,
 )
 
@@ -2512,33 +2515,65 @@ STYLES = {
 }
 
 
+_UNSET = object()
+
+DEFAULT_VIEWER_CONFIG = {
+    "style": "ball-and-stick",
+    "background_color": "white",
+    "show_axes": False,
+    "projection": "orthographic",
+    "width": "100%",
+    "height": "400px",
+    "viewer_outline": False,
+    "fog": False,
+    "fog_strength": 0.5,
+    "draw_outlines": False,
+    "draw_labels": False,
+    "measuring_tool": False,
+    "unwrap_molecules": False,
+    "spin": False,
+    "spin_axis": (0.0, 1.0, 0.0),
+    "spin_speed": 2.0,
+    "multi_traj": True,
+    "traj_fps": 10.0,
+    "trajectory_slider": False,
+    "compute_extra_data": False,
+    "show_help": True,
+    "recording_tools": False,
+    "dpi": 200,
+    "record_include_bgd": False,
+    "record_include_ui": False,
+}
+
+
 def view_structure(
     data: dict | list[dict],
-    style: str = "ball-and-stick",
-    background_color: str = "white",
-    show_axes: bool = False,
-    projection: str = "orthographic",
-    width: str = "100%",
-    height: str = "400px",
-    viewer_outline: bool | str = False,
-    fog: bool = False,
-    fog_strength: float = 0.5,
-    draw_outlines: bool = False,
-    draw_labels: bool = False,
-    measuring_tool: bool = False,
-    unwrap_molecules: bool = False,
-    spin: bool = False,
-    spin_axis: tuple[float, float, float] = (0.0, 1.0, 0.0),
-    spin_speed: float = 2.0,
-    multi_traj: bool = True,
-    traj_fps: float = 10.0,
-    trajectory_slider: bool = False,
-    compute_extra_data: bool = False,
-    show_help: bool = True,
-    recording_tools: bool = False,
-    dpi: int = 200,
-    record_include_bgd: bool = False,
-    record_include_ui: bool = False,
+    config: dict | str | os.PathLike | None = None,
+    style: str | dict = _UNSET,
+    background_color: str = _UNSET,
+    show_axes: bool = _UNSET,
+    projection: str = _UNSET,
+    width: str = _UNSET,
+    height: str = _UNSET,
+    viewer_outline: bool | str = _UNSET,
+    fog: bool = _UNSET,
+    fog_strength: float = _UNSET,
+    draw_outlines: bool = _UNSET,
+    draw_labels: bool = _UNSET,
+    measuring_tool: bool = _UNSET,
+    unwrap_molecules: bool = _UNSET,
+    spin: bool = _UNSET,
+    spin_axis: tuple[float, float, float] | list[float] = _UNSET,
+    spin_speed: float = _UNSET,
+    multi_traj: bool = _UNSET,
+    traj_fps: float = _UNSET,
+    trajectory_slider: bool = _UNSET,
+    compute_extra_data: bool = _UNSET,
+    show_help: bool = _UNSET,
+    recording_tools: bool = _UNSET,
+    dpi: int = _UNSET,
+    record_include_bgd: bool = _UNSET,
+    record_include_ui: bool = _UNSET,
 ) -> mo.ui.anywidget:
     """
     Visualize a molecule or periodic structure in the notebook.
@@ -2549,35 +2584,38 @@ def view_structure(
         A dictionary with keys 'positions', 'species', 'bonds' (optional), 'unit_cell' (optional),
         'labels' (optional), 'highlight' (optional), 'extra_data' (optional) or a list of such dictionaries
         for a trajectory.
+    config : dict, str, or os.PathLike, optional
+        A dictionary, path to a TOML file (PathLike or str), or a TOML formatted string containing configuration
+        settings. Default is None. Any explicitly provided arguments to view_structure will override the settings in config.
     style : str or dict, optional
-        Style options: 'vdw' (default), 'ball-and-stick', 'wireframe', or a custom dictionary.
+        Style options: 'ball-and-stick' (default), 'vdw', 'wireframe', or a custom dictionary.
     background_color : str, optional
-        Background color of the viewer.
+        Background color of the viewer. Default is "white".
     show_axes : bool, optional
-        Whether to display XYZ axes in the corner.
+        Whether to display XYZ axes in the corner. Default is False.
     projection : str, optional
         Projection type: 'orthographic' (default) or 'perspective'.
     width : str, optional
-        Width of the viewer.
+        Width of the viewer. Default is "100%".
     height : str, optional
-        Height of the viewer.
+        Height of the viewer. Default is "400px".
     viewer_outline : bool or str, optional
-        Whether to draw outlines around the viewer.
+        Whether to draw outlines around the viewer. Default is False.
     fog : bool, optional
-        Whether to apply fog effect.
+        Whether to apply fog effect. Default is False.
     fog_strength : float, optional
-        Strength of the fog effect.
+        Strength of the fog effect. Default is 0.5.
     draw_outlines : bool, optional
-        Whether to draw outlines around atoms and bonds.
+        Whether to draw outlines around atoms and bonds. Default is False.
     draw_labels : bool, optional
-        Whether to draw labels for atoms.
+        Whether to draw labels for atoms. Default is False.
     measuring_tool : bool, optional
-        Whether to enable measuring tool.
+        Whether to enable measuring tool. Default is False.
     unwrap_molecules : bool, optional
-        Whether to unwrap molecules split across periodic boundaries.
+        Whether to unwrap molecules split across periodic boundaries. Default is False.
     spin : bool, optional
-        Whether to spin the structure.
-    spin_axis : tuple[float, float, float], optional
+        Whether to spin the structure. Default is False.
+    spin_axis : tuple[float, float, float] or list[float], optional
         The axis of rotation, in cartesian coordinates. Default is (0.0, 1.0, 0.0).
     spin_speed : float, optional
         The speed of rotation. Default is 2.0. The rotation is clockwise, if an
@@ -2585,28 +2623,63 @@ def view_structure(
     multi_traj : bool, optional
         Whether to show trajectory playback controls (play/pause button) for trajectory data (default is True). If False, the play/pause button will be hidden.
     traj_fps : float, optional
-        Frames per second for playing trajectory animations (default is 10.0).
+        Frames per second for playing trajectory animations. Default is 10.0.
     trajectory_slider : bool, optional
-        Whether to show a frame slider for trajectory data (default is False).
+        Whether to show a frame slider for trajectory data. Default is False.
     compute_extra_data : bool, optional
         Whether to compute and display extra data (number of atoms, atomic weight for non-periodic;
         density, volume, number of atoms, and cell vector lengths for periodic structures). Default is False.
     show_help : bool, optional
-        Whether to show the help button and enable the 'h' interaction help overlay (default is True).
+        Whether to show the help button and enable the 'h' interaction help overlay. Default is True.
     recording_tools : bool, optional
-        Whether to show screenshot (PNG) and animation video recording (WebM/MP4) tools in the viewer toolbar (default is False).
+        Whether to show screenshot (PNG) and animation video recording (WebM/MP4) tools in the viewer toolbar. Default is False.
     dpi : int, optional
-        Resolution in dots per inch (DPI) for exported screenshots and video recordings (default is 200).
+        Resolution in dots per inch (DPI) for exported screenshots and video recordings. Default is 200.
     record_include_bgd : bool, optional
         Whether to include the viewer's background color in exported screenshots and video recordings (default is False, which produces transparent backgrounds).
     record_include_ui : bool, optional
-        Whether to include viewer UI elements (playback controls, info panels, measurement badges, labels) in exported screenshots and video recordings (default is False).
+        Whether to include viewer UI elements (playback controls, info panels, measurement badges, labels) in exported screenshots and video recordings. Default is False.
 
     Returns
     -------
     marimo.ui.anywidget
         The molecule viewer widget.
     """
+    cfg_dict = parse_toml_config(config) if config is not None else {}
+
+    def _resolve(val, key):
+        if val is not _UNSET:
+            return val
+        if key in cfg_dict:
+            return cfg_dict[key]
+        return DEFAULT_VIEWER_CONFIG[key]
+
+    style = _resolve(style, "style")
+    background_color = _resolve(background_color, "background_color")
+    show_axes = _resolve(show_axes, "show_axes")
+    projection = _resolve(projection, "projection")
+    width = _resolve(width, "width")
+    height = _resolve(height, "height")
+    viewer_outline = _resolve(viewer_outline, "viewer_outline")
+    fog = _resolve(fog, "fog")
+    fog_strength = _resolve(fog_strength, "fog_strength")
+    draw_outlines = _resolve(draw_outlines, "draw_outlines")
+    draw_labels = _resolve(draw_labels, "draw_labels")
+    measuring_tool = _resolve(measuring_tool, "measuring_tool")
+    unwrap_molecules = _resolve(unwrap_molecules, "unwrap_molecules")
+    spin = _resolve(spin, "spin")
+    spin_axis = _resolve(spin_axis, "spin_axis")
+    spin_speed = _resolve(spin_speed, "spin_speed")
+    multi_traj = _resolve(multi_traj, "multi_traj")
+    traj_fps = _resolve(traj_fps, "traj_fps")
+    trajectory_slider = _resolve(trajectory_slider, "trajectory_slider")
+    compute_extra_data = _resolve(compute_extra_data, "compute_extra_data")
+    show_help = _resolve(show_help, "show_help")
+    recording_tools = _resolve(recording_tools, "recording_tools")
+    dpi = _resolve(dpi, "dpi")
+    record_include_bgd = _resolve(record_include_bgd, "record_include_bgd")
+    record_include_ui = _resolve(record_include_ui, "record_include_ui")
+
     resolved_style = STYLES.get(style, STYLES["vdw"]) if isinstance(style, str) else style
     resolved_bg = resolve_color(background_color)
 

@@ -9,7 +9,7 @@ with app.setup:
     from ase.build import bulk, molecule
     from cspy import Molecule
     from cspy.crystal.generate_crystal import CrystalGenerator
-    from marimol import view_ase, view_cspy, view_pymatgen, view_structure
+    from marimol import parse_toml_config, view_ase, view_cspy, view_pymatgen, view_structure
     from pymatgen.core import Lattice, Structure
 
 
@@ -131,6 +131,7 @@ def _():
     | Parameter | Type | Default | Description |
     | :--- | :--- | :--- | :--- |
     | `data` / `atoms` / `structure` | `dict` \| `list[dict]` | *Required* | Structure dictionary or list of dictionaries (or `ase.Atoms`, `pymatgen.core.Structure`, `cspy.Crystal` / `cspy.Molecule`). |
+    | `config` | `dict` \| `str` \| `PathLike` | `None` | Reusable configuration dictionary, TOML string, or path to a TOML file. Explicit keyword arguments will override config values. |
     | `style` | `str` \| `dict` | `"ball-and-stick"` | Visual representation style: `"ball-and-stick"`, `"vdw"`, `"wireframe"`, or a custom style dictionary. |
     | `background_color` | `str` | `"white"` | Viewport background color (e.g. `"white"`, `"black"`, `"transparent"`, `"#1e1e1e"`). |
     | `show_axes` | `bool` | `False` | Whether to display the interactive XYZ coordinate triad in the bottom-left corner. |
@@ -577,9 +578,87 @@ def _():
         viewer_outline=True,
         fog=True,
         recording_tools=True,
-        record_include_bgd=False,
+        record_include_bgd=True,
         record_include_ui=True,
+        draw_outlines=True,
     )
+
+    mo.vstack([_code, _viewer])
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ### 6. Config-Driven Visualization: Loading Settings from TOML & Dict
+
+    You can define reusable viewer styles and presets using Python dictionaries, TOML formatted strings, or `.toml` configuration files, and supply them via the `config` argument. Any explicitly passed arguments to the viewer will overwrite the settings specified in the configuration.
+
+    The example below visualizes an ethanol ($\text{C}_2\text{H}_5\text{OH}$) molecule configured through a TOML string with custom background color, coordinate axes, auto-spin, and measurement & recording tools.
+    """)
+    return
+
+
+@app.cell
+def _():
+    _code = mo.accordion({
+        "View Code": mo.md(r"""
+    ```python
+    from ase.build import molecule
+    from marimol import view_ase
+
+    # 1. Config can be defined as a TOML formatted string (or loaded from a Path / .toml file)
+    toml_config = '''
+    style = "ball-and-stick"
+    background_color = "#0f172a"
+    show_axes = true
+    viewer_outline = "1px solid #334155"
+    spin = true
+    spin_speed = 1.5
+    measuring_tool = true
+    recording_tools = true
+    record_include_bgd = true
+    '''
+
+    # 2. Or alternatively as a Python dictionary:
+    # dict_config = {
+    #     "style": "ball-and-stick",
+    #     "background_color": "#0f172a",
+    #     "show_axes": True,
+    #     "spin": True,
+    #     "spin_speed": 1.5,
+    #     "measuring_tool": True,
+    #     "recording_tools": True,
+    #     "record_include_bgd": True,
+    # }
+
+    ethanol = molecule("CH3CH2OH")
+
+    # Pass config and optionally overwrite specific properties with explicit arguments
+    view_ase(
+        ethanol,
+        config=toml_config,
+        # Explicit arguments take precedence and overwrite config values:
+        # background_color="#1e293b",
+    )
+    ```
+    """)
+    })
+
+    _ethanol = molecule("CH3CH2OH")
+    _toml_config = """
+    style = "ball-and-stick"
+    background_color = "#0f172a"
+    show_axes = true
+    viewer_outline = "1px solid #334155"
+    spin = true
+    spin_speed = 1.5
+    measuring_tool = true
+    recording_tools = true
+    record_include_bgd = true
+    """
+
+    _viewer = view_ase(_ethanol, config=_toml_config)
 
     mo.vstack([_code, _viewer])
     return
