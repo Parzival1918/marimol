@@ -114,8 +114,11 @@ def _():
       - Click the ruler button again or click empty canvas space to exit measurement mode.
     - **Extra Data Drawer**:
       - Click the **List icon** in the top-right overlay to expand the metadata drawer, showing properties such as unit cell volume, density, lattice parameters ($a, b, c, \alpha, \beta, \gamma$), atom counts, or custom calculation results.
+    - **Capture & Recording Tools**:
+      - Click the **Camera icon** (or press <kbd>S</kbd>) to save a high-resolution PNG screenshot directly to your downloads.
+      - Click the **Video icon** (or press <kbd>R</kbd>) to record WebM/MP4 animations of trajectory playback or auto-spin, or to record your manual interactions with the structure.
     - **Help & Controls Overlay**:
-      - Press the <kbd>H</kbd> key while hovering over the viewer or click the **Question Mark icon** in the top-right overlay to display an interactive summary of all navigation, selection, measuring, trajectory, and axis controls.
+      - Press the <kbd>H</kbd> key while hovering over the viewer or click the **Question Mark icon** in the top-right overlay to display an interactive summary of all navigation, selection, measuring, recording, trajectory, and axis controls.
     - **Trajectory Controls**:
       - When visualizing a list of frames, a media player overlay appears with buttons for First, Previous, Play/Pause, Next, and Last frame, as well as an optional scrubbable frame slider.
 
@@ -149,6 +152,8 @@ def _():
     | `trajectory_slider` | `bool` | `False` | Displays a scrubbable timeline slider in the trajectory control bar. |
     | `compute_extra_data` | `bool` | `False` | Automatically computes physical/crystallographic properties (density, volume, lattice lengths & angles, atom count, molecular weight) for the info drawer. |
     | `show_help` | `bool` | `True` | Whether to show the help button and enable the 'h' interaction help overlay. |
+    | `recording_tools` | `bool` | `False` | Whether to show screenshot (PNG) and animation video recording (WebM/MP4) buttons in the viewer toolbar. |
+    | `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. |
 
     ### Custom Style Dictionaries
 
@@ -489,7 +494,7 @@ def _():
     mo.md(r"""
     ### 5. CSPY Integration: Crystal Structure Generation with `CrystalGenerator`
 
-    Visualizing predicted molecular crystal candidates generated with **mol-cspy**'s `CrystalGenerator` (`cspy.crystal.generate_crystal.CrystalGenerator`). Multiple candidate crystal structures are loaded as a collection with interactive trajectory navigation (`multi_traj=False`, `trajectory_slider=True`), and automated crystallographic data computation (`compute_extra_data=True`).
+    Visualizing predicted molecular crystal candidates generated with **mol-cspy**'s `CrystalGenerator` (`cspy.crystal.generate_crystal.CrystalGenerator`). Multiple candidate crystal structures are loaded as a collection with interactive trajectory navigation (`multi_traj=False`, `trajectory_slider=True`), and automated crystallographic data computation (`compute_extra_data=True`). Screen captures and recordings can be taken (`recording_tools=True`).
     """)
     return
 
@@ -534,6 +539,7 @@ def _():
         show_axes=True,
         viewer_outline=True,
         fog=True,
+        recording_tools=True,
     )
     ```
     """)
@@ -566,6 +572,7 @@ def _():
         show_axes=True,
         viewer_outline=True,
         fog=True,
+        recording_tools=True,
     )
 
     mo.vstack([_code, _viewer])

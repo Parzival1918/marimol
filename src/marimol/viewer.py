@@ -70,7 +70,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             const orthoCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000);
             let camera = model.get('projection') === 'orthographic' ? orthoCamera : persCamera;
 
-            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
             renderer.setSize(container.clientWidth, container.clientHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.autoClear = false; // We need to manage clearing for multiple viewports
@@ -458,6 +458,13 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">List Icon</span></span><span style="color:#555;">Toggle metadata</span></div>`;
                 }
 
+                // Capture & Recording (Conditional)
+                if (model.get('recording_tools')) {
+                    html += `<div style="${sectionTitleStyle}">Capture & Recording</div>`;
+                    html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">Camera</span> / <span style="${kbdStyle}">S</span></span><span style="color:#555;">Screenshot (PNG)</span></div>`;
+                    html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">Video</span> / <span style="${kbdStyle}">R</span></span><span style="color:#555;">Record Animation</span></div>`;
+                }
+
                 // Keyboard Shortcuts
                 html += `<div style="${sectionTitleStyle}">Shortcuts</div>`;
                 html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">H</span></span><span style="color:#555;">Toggle help overlay</span></div>`;
@@ -499,6 +506,360 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
             helpBtn.addEventListener('click', () => {
                 toggleHelp();
+            });
+
+            // --- Screenshot & Animation Recording UI ---
+            const captureContainer = document.createElement('div');
+            captureContainer.style.display = model.get('recording_tools') ? 'flex' : 'none';
+            captureContainer.style.flexDirection = 'column';
+            captureContainer.style.alignItems = 'flex-end';
+            captureContainer.style.pointerEvents = 'auto';
+            captureContainer.style.gap = '8px';
+
+            const cameraSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>`;
+            const screenshotBtn = document.createElement('button');
+            screenshotBtn.innerHTML = cameraSvg;
+            screenshotBtn.style.color = '#333';
+            screenshotBtn.style.background = 'rgba(255, 255, 255, 0.7)';
+            screenshotBtn.style.border = 'none';
+            screenshotBtn.style.backdropFilter = 'blur(10px)';
+            screenshotBtn.style.WebkitBackdropFilter = 'blur(10px)';
+            screenshotBtn.style.borderRadius = '8px';
+            screenshotBtn.style.padding = '8px';
+            screenshotBtn.style.cursor = 'pointer';
+            screenshotBtn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+            screenshotBtn.style.transition = 'background 0.2s, transform 0.1s';
+            screenshotBtn.title = 'Capture Screenshot (PNG)';
+
+            screenshotBtn.onmouseover = () => { screenshotBtn.style.background = 'rgba(255,255,255,0.9)'; screenshotBtn.style.transform = 'scale(1.1)'; };
+            screenshotBtn.onmouseout = () => { screenshotBtn.style.background = 'rgba(255,255,255,0.7)'; screenshotBtn.style.transform = 'scale(1)'; };
+
+            const videoSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>`;
+            const stopSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:block;"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>`;
+
+            const recordBtn = document.createElement('button');
+            recordBtn.innerHTML = videoSvg;
+            recordBtn.style.color = '#333';
+            recordBtn.style.background = 'rgba(255, 255, 255, 0.7)';
+            recordBtn.style.border = 'none';
+            recordBtn.style.backdropFilter = 'blur(10px)';
+            recordBtn.style.WebkitBackdropFilter = 'blur(10px)';
+            recordBtn.style.borderRadius = '8px';
+            recordBtn.style.padding = '8px';
+            recordBtn.style.cursor = 'pointer';
+            recordBtn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+            recordBtn.style.transition = 'background 0.2s, transform 0.1s';
+            recordBtn.title = 'Record Animation (WebM/MP4)';
+
+            let isRecording = false;
+
+            recordBtn.onmouseover = () => { if (!isRecording) { recordBtn.style.background = 'rgba(255,255,255,0.9)'; recordBtn.style.transform = 'scale(1.1)'; } };
+            recordBtn.onmouseout = () => { if (!isRecording) { recordBtn.style.background = 'rgba(255,255,255,0.7)'; recordBtn.style.transform = 'scale(1)'; } };
+
+            const recordingBadge = document.createElement('div');
+            recordingBadge.style.display = 'none';
+            recordingBadge.style.padding = '4px 8px';
+            recordingBadge.style.background = 'rgba(229, 57, 53, 0.85)';
+            recordingBadge.style.backdropFilter = 'blur(10px)';
+            recordingBadge.style.WebkitBackdropFilter = 'blur(10px)';
+            recordingBadge.style.borderRadius = '6px';
+            recordingBadge.style.fontFamily = 'monospace';
+            recordingBadge.style.fontSize = '11px';
+            recordingBadge.style.fontWeight = 'bold';
+            recordingBadge.style.color = 'white';
+            recordingBadge.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+            recordingBadge.style.whiteSpace = 'nowrap';
+            recordingBadge.innerText = '● REC 00:00';
+
+            captureContainer.appendChild(screenshotBtn);
+            captureContainer.appendChild(recordBtn);
+            captureContainer.appendChild(recordingBadge);
+            captureContainer.addEventListener('click', (e) => e.stopPropagation());
+
+            const captureScreenshot = async (defaultName = 'marimol_structure.png') => {
+                const dpi = model.get('dpi') || 200;
+                const scale = Math.max(0.5, Math.min(8.0, dpi / 96.0));
+                const origWidth = container.clientWidth;
+                const origHeight = container.clientHeight;
+                const targetWidth = Math.round(origWidth * scale);
+                const targetHeight = Math.round(origHeight * scale);
+                const origPixelRatio = renderer.getPixelRatio();
+
+                // Trigger native file picker synchronously while user gesture is active
+                let fileHandlePromise = null;
+                if (typeof window.showSaveFilePicker === 'function') {
+                    try {
+                        fileHandlePromise = window.showSaveFilePicker({
+                            suggestedName: defaultName,
+                            types: [{
+                                description: 'PNG Image (*.png)',
+                                accept: { 'image/png': ['.png'] },
+                            }],
+                        });
+                    } catch (err) {
+                        console.warn('showSaveFilePicker synchronous error:', err);
+                    }
+                }
+
+                // Render high-DPI frame
+                renderer.setPixelRatio(1);
+                renderer.setSize(targetWidth, targetHeight, false);
+
+                if (camera.isPerspectiveCamera) {
+                    camera.aspect = targetWidth / targetHeight;
+                    camera.updateProjectionMatrix();
+                }
+
+                renderer.setViewport(0, 0, targetWidth, targetHeight);
+                renderer.clear();
+                renderer.render(scene, camera);
+
+                if (model.get('show_axes')) {
+                    axesCamera.position.copy(camera.position).sub(controls.target).normalize().multiplyScalar(4);
+                    axesCamera.quaternion.copy(camera.quaternion);
+                    renderer.clearDepth();
+                    const axesSize = Math.round(80 * scale);
+                    const axesMargin = Math.round(10 * scale);
+                    renderer.setViewport(axesMargin, axesMargin, axesSize, axesSize);
+                    renderer.render(axesScene, axesCamera);
+                }
+
+                const blobPromise = new Promise((resolve) => {
+                    renderer.domElement.toBlob(resolve, 'image/png');
+                });
+
+                // Restore live renderer dimensions
+                renderer.setPixelRatio(origPixelRatio);
+                renderer.setSize(origWidth, origHeight);
+                if (camera.isPerspectiveCamera) {
+                    camera.aspect = origWidth / origHeight;
+                    camera.updateProjectionMatrix();
+                }
+
+                try {
+                    let fileHandle = null;
+                    if (fileHandlePromise) {
+                        try {
+                            fileHandle = await fileHandlePromise;
+                        } catch (err) {
+                            if (err && err.name === 'AbortError') return; // User cancelled
+                            console.warn('showSaveFilePicker rejected or unsupported:', err);
+                        }
+                    }
+
+                    const blob = await blobPromise;
+                    if (!blob) return;
+
+                    if (fileHandle) {
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        return;
+                    }
+
+                    // Fallback for browsers/contexts without File System Access API
+                    let filename = prompt('Enter file name to save:', defaultName);
+                    if (!filename) return;
+                    if (!filename.toLowerCase().endsWith('.png')) {
+                        filename += '.png';
+                    }
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(url), 2000);
+                } catch (err) {
+                    console.error('Error saving screenshot:', err);
+                }
+            };
+
+            screenshotBtn.addEventListener('click', () => {
+                captureScreenshot();
+            });
+
+            let mediaRecorder = null;
+            let recordedChunks = [];
+            let recordTimerInterval = null;
+            let recordSeconds = 0;
+            let origPixelRatioBeforeRecord = 1;
+
+            const getSupportedMimeType = () => {
+                const types = [
+                    'video/webm;codecs=vp9',
+                    'video/webm;codecs=vp8',
+                    'video/webm',
+                    'video/mp4'
+                ];
+                for (const t of types) {
+                    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t)) return t;
+                }
+                return '';
+            };
+
+            const startRecording = () => {
+                if (isRecording) return;
+                const fps = model.get('traj_fps') || 30;
+                const dpi = model.get('dpi') || 200;
+                const targetPixelRatio = Math.max(1.0, Math.min(3.0, dpi / 96.0));
+                origPixelRatioBeforeRecord = renderer.getPixelRatio();
+                renderer.setPixelRatio(targetPixelRatio);
+                renderer.setSize(container.clientWidth, container.clientHeight);
+
+                const stream = renderer.domElement.captureStream ? renderer.domElement.captureStream(Math.max(15, Math.min(60, fps))) : null;
+                if (!stream) {
+                    console.warn('HTMLCanvasElement.captureStream is not supported in this browser.');
+                    renderer.setPixelRatio(origPixelRatioBeforeRecord);
+                    renderer.setSize(container.clientWidth, container.clientHeight);
+                    return;
+                }
+
+                recordedChunks = [];
+                const mimeType = getSupportedMimeType();
+                const options = mimeType ? { mimeType } : {};
+
+                try {
+                    mediaRecorder = new MediaRecorder(stream, options);
+                } catch (err) {
+                    console.warn('Could not initialize MediaRecorder:', err);
+                    renderer.setPixelRatio(origPixelRatioBeforeRecord);
+                    renderer.setSize(container.clientWidth, container.clientHeight);
+                    return;
+                }
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0) {
+                        recordedChunks.push(e.data);
+                    }
+                };
+
+                mediaRecorder.start(100);
+                isRecording = true;
+                recordBtn.innerHTML = stopSvg;
+                recordBtn.style.background = '#e53935';
+                recordBtn.style.color = 'white';
+                recordBtn.title = 'Stop Recording';
+                recordingBadge.style.display = 'flex';
+                recordSeconds = 0;
+                recordingBadge.innerText = '● REC 00:00';
+                recordTimerInterval = setInterval(() => {
+                    recordSeconds++;
+                    const mins = String(Math.floor(recordSeconds / 60)).padStart(2, '0');
+                    const secs = String(recordSeconds % 60).padStart(2, '0');
+                    recordingBadge.innerText = `● REC ${mins}:${secs}`;
+                }, 1000);
+
+                const frames = model.get('data') || [];
+                const multiTraj = model.get('multi_traj') !== false;
+                if (frames.length > 1 && multiTraj && !isPlaying) {
+                    setFrame(0);
+                    togglePlay();
+                }
+            };
+
+            const stopRecording = async () => {
+                if (!isRecording) return;
+                isRecording = false;
+                if (recordTimerInterval) {
+                    clearInterval(recordTimerInterval);
+                    recordTimerInterval = null;
+                }
+                renderer.setPixelRatio(origPixelRatioBeforeRecord || window.devicePixelRatio || 1);
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                recordingBadge.style.display = 'none';
+                recordBtn.innerHTML = videoSvg;
+                recordBtn.style.background = 'rgba(255, 255, 255, 0.7)';
+                recordBtn.style.color = '#333';
+                recordBtn.title = 'Record Animation (WebM/MP4)';
+
+                const rawType = (mediaRecorder && mediaRecorder.mimeType) || getSupportedMimeType() || 'video/webm';
+                const pureMime = rawType.split(';')[0].trim() || 'video/webm';
+                const ext = pureMime.includes('mp4') ? 'mp4' : 'webm';
+                const desc = ext === 'mp4' ? 'MP4 Video (*.mp4)' : 'WebM Video (*.webm)';
+                const defaultName = `marimol_animation.${ext}`;
+
+                // Trigger native file picker synchronously during user gesture!
+                let fileHandlePromise = null;
+                if (typeof window.showSaveFilePicker === 'function') {
+                    try {
+                        fileHandlePromise = window.showSaveFilePicker({
+                            suggestedName: defaultName,
+                            types: [{
+                                description: desc,
+                                accept: { [pureMime]: [`.${ext}`] },
+                            }],
+                        });
+                    } catch (err) {
+                        console.warn('showSaveFilePicker synchronous error:', err);
+                    }
+                }
+
+                // Stop recorder and collect final blob
+                const blobPromise = new Promise((resolve) => {
+                    if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+                        resolve(new Blob(recordedChunks, { type: rawType }));
+                    } else {
+                        mediaRecorder.onstop = () => {
+                            resolve(new Blob(recordedChunks, { type: rawType }));
+                        };
+                        mediaRecorder.stop();
+                    }
+                });
+
+                try {
+                    let fileHandle = null;
+                    if (fileHandlePromise) {
+                        try {
+                            fileHandle = await fileHandlePromise;
+                        } catch (err) {
+                            if (err && err.name === 'AbortError') {
+                                return; // User cancelled file picker dialog
+                            }
+                            console.warn('showSaveFilePicker rejected or blocked:', err);
+                        }
+                    }
+
+                    const blob = await blobPromise;
+                    if (!blob || blob.size === 0) return;
+
+                    if (fileHandle) {
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(blob);
+                        await writable.close();
+                        return;
+                    }
+
+                    // Fallback for browsers/contexts without File System Access API
+                    let filename = prompt('Enter file name to save:', defaultName);
+                    if (!filename) return; // User cancelled
+                    if (!filename.toLowerCase().endsWith(`.${ext}`)) {
+                        filename += `.${ext}`;
+                    }
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(url), 2000);
+                } catch (err) {
+                    console.error('Error saving recorded animation:', err);
+                }
+            };
+
+            const toggleRecording = () => {
+                if (isRecording) {
+                    stopRecording();
+                } else {
+                    startRecording();
+                }
+            };
+
+            recordBtn.addEventListener('click', () => {
+                toggleRecording();
             });
 
             // --- Measuring Tool UI ---
@@ -597,10 +958,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             extraDataContainer.appendChild(extraDataBtn);
             extraDataContainer.appendChild(extraDataPanel);
 
-            // Note: Since infoPanel has margin-top: auto, we want extraData to be above infoPanel in the DOM.
-            // rightSideContainer currently has infoPanel appended first.
-            // We should insert helpContainer, measureContainer and extraDataContainer BEFORE infoPanel so they appear at the top!
+            // Note: Since infoPanel has margin-top: auto, we want toolbar buttons above infoPanel in the DOM.
             rightSideContainer.insertBefore(helpContainer, infoPanel);
+            rightSideContainer.insertBefore(captureContainer, infoPanel);
             rightSideContainer.insertBefore(measureContainer, infoPanel);
             rightSideContainer.insertBefore(extraDataContainer, infoPanel);
             container.appendChild(rightSideContainer);
@@ -1301,6 +1661,14 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     toggleHelp(false);
                 }
             });
+            model.on("change:recording_tools", () => {
+                const show = model.get('recording_tools');
+                captureContainer.style.display = show ? 'flex' : 'none';
+                if (!show && isRecording) {
+                    stopRecording();
+                }
+                if (isHelpOpen) updateHelpContent();
+            });
             model.on("change:multi_traj", () => {
                 const showPlay = model.get('multi_traj') !== false;
                 btnPlay.style.display = showPlay ? 'flex' : 'none';
@@ -1409,24 +1777,37 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             });
             resizeObserver.observe(container);
 
-            // Handle KeyDown for Help Overlay Toggle
+            // Handle KeyDown for Help Overlay and Shortcuts Toggle
             let isContainerHovered = false;
             container.addEventListener('mouseenter', () => { isContainerHovered = true; });
             container.addEventListener('mouseleave', () => { isContainerHovered = false; });
 
             const handleKeyDown = (e) => {
-                if (!model.get('show_help')) return;
                 if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
 
                 const isTargetInside = container.contains(e.target) || isContainerHovered || document.activeElement === container;
                 if (!isTargetInside) return;
 
-                if ((e.key === 'h' || e.key === 'H') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                    e.preventDefault();
-                    toggleHelp();
-                } else if (e.key === 'Escape' && isHelpOpen) {
-                    e.preventDefault();
-                    toggleHelp(false);
+                if (model.get('show_help')) {
+                    if ((e.key === 'h' || e.key === 'H') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                        e.preventDefault();
+                        toggleHelp();
+                        return;
+                    } else if (e.key === 'Escape' && isHelpOpen) {
+                        e.preventDefault();
+                        toggleHelp(false);
+                        return;
+                    }
+                }
+
+                if (model.get('recording_tools')) {
+                    if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                        e.preventDefault();
+                        captureScreenshot();
+                    } else if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                        e.preventDefault();
+                        toggleRecording();
+                    }
                 }
             };
 
@@ -1622,6 +2003,12 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 cancelAnimationFrame(animationId);
                 resizeObserver.disconnect();
                 window.removeEventListener('keydown', handleKeyDown);
+                if (isRecording) {
+                    stopRecording();
+                }
+                if (recordTimerInterval) {
+                    clearInterval(recordTimerInterval);
+                }
                 if (atomMesh) {
                     atomMesh.dispose();
                     scene.remove(atomMesh);
@@ -1670,6 +2057,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     traj_fps = traitlets.Float(10.0).tag(sync=True)
     trajectory_slider = traitlets.Bool(False).tag(sync=True)
     show_help = traitlets.Bool(True).tag(sync=True)
+    recording_tools = traitlets.Bool(False).tag(sync=True)
+    dpi = traitlets.Int(200).tag(sync=True)
 
 
 STYLES = {
@@ -1720,6 +2109,8 @@ def view_structure(
     trajectory_slider: bool = False,
     compute_extra_data: bool = False,
     show_help: bool = True,
+    recording_tools: bool = False,
+    dpi: int = 200,
 ) -> mo.ui.anywidget:
     """
     Visualize a molecule or periodic structure in the notebook.
@@ -1774,6 +2165,10 @@ def view_structure(
         density, volume, number of atoms, and cell vector lengths for periodic structures). Default is False.
     show_help : bool, optional
         Whether to show the help button and enable the 'h' interaction help overlay (default is True).
+    recording_tools : bool, optional
+        Whether to show screenshot (PNG) and animation video recording (WebM/MP4) tools in the viewer toolbar (default is False).
+    dpi : int, optional
+        Resolution in dots per inch (DPI) for exported screenshots and video recordings (default is 200).
 
     Returns
     -------
@@ -1834,6 +2229,8 @@ def view_structure(
         traj_fps=traj_fps,
         trajectory_slider=trajectory_slider,
         show_help=show_help,
+        recording_tools=recording_tools,
+        dpi=dpi,
     )
 
     return mo.ui.anywidget(widget)

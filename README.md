@@ -24,6 +24,7 @@ Supports visualization of **ASE**, **Pymatgen**, **mol-cspy**, and native Python
 - 🧊 **Crystallography & Periodic Boundaries**: Unit cell bounding boxes, crystallographic lattice vector indicators ($a, b, c$), and automatic molecule unwrapping across periodic boundary conditions (`unwrap_molecules=True`).
 - 🎨 **Visual Styles & Cel Shading**: Ball-and-stick, Van der Waals (VDW), wireframe, stylized cartoon silhouette outlines (`draw_outlines=True`), atom element/index labels (`draw_labels=True`), depth fog, and custom styles.
 - 📊 **Metadata Drawer**: Instant inspection of unit cell parameters ($a, b, c, \alpha, \beta, \gamma$), volume, density, and custom calculation results.
+- 📸 **Image Capture & Video Recording**: High-resolution PNG screenshots (<kbd>S</kbd>) and WebM/MP4 animation recordings (<kbd>R</kbd>) of trajectories or auto-spin loops directly to your downloads.
 - ❓ **Interactive Help & Controls Overlay**: Built-in cheatsheet of all keyboard and mouse interactions (toggle with <kbd>H</kbd> or the <kbd>?</kbd> button).
 
 ---
@@ -135,6 +136,8 @@ f"Currently viewing trajectory frame: {current_step}"
 | **Snap View to Axis** | Click **X**, **Y**, or **Z** on the bottom-left coordinate triad |
 | **Measurement Tool** | Click the **Ruler icon** (top-right), then pick 2 (dist), 3 (angle), or 4 (dihedral) atoms |
 | **Extra Data Drawer** | Click the **List icon** (top-right) to expand the metadata drawer |
+| **Capture Screenshot** | Click the **Camera icon** or press <kbd>S</kbd> (when `recording_tools=True`) |
+| **Record Animation** | Click the **Video icon** or press <kbd>R</kbd> (when `recording_tools=True`) |
 | **Help & Shortcuts** | Press <kbd>H</kbd> or click the <kbd>?</kbd> icon to open the controls overlay |
 | **Close Help** | Press <kbd>Esc</kbd> or click outside the modal |
 
@@ -168,6 +171,8 @@ All viewer functions (`view_structure`, `view_ase`, `view_pymatgen`, `view_cspy`
 | `trajectory_slider` | `bool` | `False` | Scrubbable timeline slider in the trajectory control bar. |
 | `compute_extra_data` | `bool` | `False` | Automatically compute density, volume, lattice lengths & angles, atom count, and MW for the metadata drawer. |
 | `show_help` | `bool` | `True` | Show the help button and enable the <kbd>H</kbd> interactive controls overlay. |
+| `recording_tools` | `bool` | `False` | Show screenshot (PNG) and video recording (WebM/MP4) buttons in the viewer toolbar. |
+| `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. |
 
 ---
 
@@ -177,11 +182,11 @@ Pass a custom dictionary to `style`:
 
 ```python
 custom_style = {
-    "bond_radius": 0.12,          # Cylinder radius for bonds in Å (0.0 hides bonds)
-    "atomic_radius_scaler": 0.8,   # Scale factor multiplied by atomic/VdW radii
-    "hydrogen_atom_radius": 0.2,   # Fixed radius override for hydrogen atoms
-    "fixed_atomic_radius": None,   # Fixed radius override for all non-H atoms
-    "use_vdw_radii": False,        # True for Van der Waals radii; False for covalent
+    "bond_radius": 0.12,  # Cylinder radius for bonds in Å (0.0 hides bonds)
+    "atomic_radius_scaler": 0.8,  # Scale factor multiplied by atomic/VdW radii
+    "hydrogen_atom_radius": 0.2,  # Fixed radius override for hydrogen atoms
+    "fixed_atomic_radius": None,  # Fixed radius override for all non-H atoms
+    "use_vdw_radii": False,  # True for Van der Waals radii; False for covalent
 }
 
 view_structure(data, style=custom_style)
