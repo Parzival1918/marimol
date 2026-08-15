@@ -74,6 +74,12 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             renderer.setSize(container.clientWidth, container.clientHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.autoClear = false; // We need to manage clearing for multiple viewports
+            renderer.domElement.style.position = 'absolute';
+            renderer.domElement.style.top = '0';
+            renderer.domElement.style.left = '0';
+            renderer.domElement.style.width = '100%';
+            renderer.domElement.style.height = '100%';
+            renderer.domElement.style.display = 'block';
             container.appendChild(renderer.domElement);
 
             // Axes setup (overlay)
@@ -214,17 +220,17 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 btn.innerHTML = htmlContent;
                 btn.style.background = 'transparent';
                 btn.style.border = 'none';
+                btn.style.outline = 'none';
                 btn.style.borderRadius = '4px';
                 btn.style.cursor = 'pointer';
                 btn.style.padding = '4px';
                 btn.style.display = 'flex';
                 btn.style.alignItems = 'center';
                 btn.style.justifyContent = 'center';
-                btn.style.color = '#555';
-                btn.style.transition = 'background 0.2s';
+                btn.style.transition = 'transform 0.2s, background 0.2s';
                 btn.onclick = onClick;
-                btn.onmouseover = () => btn.style.background = 'rgba(0,0,0,0.08)';
-                btn.onmouseout = () => btn.style.background = 'transparent';
+                btn.onmouseover = () => { btn.style.transform = 'scale(1.1)'; btn.style.background = 'rgba(0,0,0,0.08)'; };
+                btn.onmouseout = () => { btn.style.transform = 'scale(1)'; btn.style.background = 'transparent'; };
                 return btn;
             };
 
@@ -339,6 +345,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
             // --- Atom Info Panel (Stationary at Bottom-Right) ---
             const infoPanel = document.createElement('div');
+            infoPanel.id = 'infoPanel';
             infoPanel.style.marginTop = 'auto'; // push to the bottom
             infoPanel.style.pointerEvents = 'auto';
             infoPanel.style.display = 'none'; // hidden by default
@@ -374,17 +381,18 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             helpBtn.style.color = '#333';
             helpBtn.style.background = 'rgba(255, 255, 255, 0.7)';
             helpBtn.style.border = 'none';
+            helpBtn.style.outline = 'none';
             helpBtn.style.backdropFilter = 'blur(10px)';
             helpBtn.style.WebkitBackdropFilter = 'blur(10px)';
             helpBtn.style.borderRadius = '8px';
             helpBtn.style.padding = '8px';
             helpBtn.style.cursor = 'pointer';
             helpBtn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-            helpBtn.style.transition = 'background 0.2s, transform 0.1s';
+            helpBtn.style.transition = 'transform 0.2s, background 0.2s, color 0.2s';
             helpBtn.title = 'Help & Controls (H)';
 
-            helpBtn.onmouseover = () => { if (!isHelpOpen) { helpBtn.style.background = 'rgba(255,255,255,0.9)'; helpBtn.style.transform = 'scale(1.1)'; } };
-            helpBtn.onmouseout = () => { if (!isHelpOpen) { helpBtn.style.background = 'rgba(255,255,255,0.7)'; helpBtn.style.transform = 'scale(1)'; } };
+            helpBtn.onmouseover = () => { helpBtn.style.transform = 'scale(1.1)'; if (!isHelpOpen) { helpBtn.style.background = 'rgba(255,255,255,0.9)'; } };
+            helpBtn.onmouseout = () => { helpBtn.style.transform = 'scale(1)'; if (!isHelpOpen) { helpBtn.style.background = 'rgba(255,255,255,0.7)'; } };
             helpContainer.appendChild(helpBtn);
             helpContainer.addEventListener('click', (e) => e.stopPropagation());
 
@@ -511,7 +519,6 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     helpOverlay.style.display = 'none';
                     helpBtn.style.background = 'rgba(255, 255, 255, 0.7)';
                     helpBtn.style.color = '#333';
-                    helpBtn.style.transform = 'scale(1)';
                     return;
                 }
                 isHelpOpen = (typeof forceState === 'boolean') ? forceState : !isHelpOpen;
@@ -520,12 +527,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     helpOverlay.style.display = 'block';
                     helpBtn.style.background = '#00acc1';
                     helpBtn.style.color = 'white';
-                    helpBtn.style.transform = 'scale(1.1)';
                 } else {
                     helpOverlay.style.display = 'none';
                     helpBtn.style.background = 'rgba(255, 255, 255, 0.7)';
                     helpBtn.style.color = '#333';
-                    helpBtn.style.transform = 'scale(1)';
                 }
             };
 
@@ -547,17 +552,18 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             screenshotBtn.style.color = '#333';
             screenshotBtn.style.background = 'rgba(255, 255, 255, 0.7)';
             screenshotBtn.style.border = 'none';
+            screenshotBtn.style.outline = 'none';
             screenshotBtn.style.backdropFilter = 'blur(10px)';
             screenshotBtn.style.WebkitBackdropFilter = 'blur(10px)';
             screenshotBtn.style.borderRadius = '8px';
             screenshotBtn.style.padding = '8px';
             screenshotBtn.style.cursor = 'pointer';
             screenshotBtn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-            screenshotBtn.style.transition = 'background 0.2s, transform 0.1s';
+            screenshotBtn.style.transition = 'transform 0.2s, background 0.2s';
             screenshotBtn.title = 'Capture Screenshot (PNG)';
 
-            screenshotBtn.onmouseover = () => { screenshotBtn.style.background = 'rgba(255,255,255,0.9)'; screenshotBtn.style.transform = 'scale(1.1)'; };
-            screenshotBtn.onmouseout = () => { screenshotBtn.style.background = 'rgba(255,255,255,0.7)'; screenshotBtn.style.transform = 'scale(1)'; };
+            screenshotBtn.onmouseover = () => { screenshotBtn.style.transform = 'scale(1.1)'; screenshotBtn.style.background = 'rgba(255,255,255,0.9)'; };
+            screenshotBtn.onmouseout = () => { screenshotBtn.style.transform = 'scale(1)'; screenshotBtn.style.background = 'rgba(255,255,255,0.7)'; };
 
             const videoSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>`;
             const stopSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:block;"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>`;
@@ -567,19 +573,20 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             recordBtn.style.color = '#333';
             recordBtn.style.background = 'rgba(255, 255, 255, 0.7)';
             recordBtn.style.border = 'none';
+            recordBtn.style.outline = 'none';
             recordBtn.style.backdropFilter = 'blur(10px)';
             recordBtn.style.WebkitBackdropFilter = 'blur(10px)';
             recordBtn.style.borderRadius = '8px';
             recordBtn.style.padding = '8px';
             recordBtn.style.cursor = 'pointer';
             recordBtn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-            recordBtn.style.transition = 'background 0.2s, transform 0.1s';
+            recordBtn.style.transition = 'transform 0.2s, background 0.2s';
             recordBtn.title = 'Record Animation (WebM/MP4)';
 
             let isRecording = false;
 
-            recordBtn.onmouseover = () => { if (!isRecording) { recordBtn.style.background = 'rgba(255,255,255,0.9)'; recordBtn.style.transform = 'scale(1.1)'; } };
-            recordBtn.onmouseout = () => { if (!isRecording) { recordBtn.style.background = 'rgba(255,255,255,0.7)'; recordBtn.style.transform = 'scale(1)'; } };
+            recordBtn.onmouseover = () => { recordBtn.style.transform = 'scale(1.1)'; if (!isRecording) { recordBtn.style.background = 'rgba(255,255,255,0.9)'; } };
+            recordBtn.onmouseout = () => { recordBtn.style.transform = 'scale(1)'; if (!isRecording) { recordBtn.style.background = 'rgba(255,255,255,0.7)'; } };
 
             const recordingBadge = document.createElement('div');
             recordingBadge.style.display = 'none';
@@ -601,7 +608,316 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             captureContainer.appendChild(recordingBadge);
             captureContainer.addEventListener('click', (e) => e.stopPropagation());
 
+            let recordCanvas = null;
+            let recordCtx = null;
+
+            const drawDomNode = (ctx, node, containerRect, scale) => {
+                if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
+                const style = window.getComputedStyle ? window.getComputedStyle(node) : node.style;
+                if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return;
+
+                const rect = node.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) return;
+
+                const x = Math.round((rect.left - containerRect.left) * scale);
+                const y = Math.round((rect.top - containerRect.top) * scale);
+                const w = Math.round(rect.width * scale);
+                const h = Math.round(rect.height * scale);
+
+                const tag = node.tagName ? node.tagName.toLowerCase() : '';
+
+                ctx.save();
+
+                // 1. Draw background & borders if any
+                const bg = style.backgroundColor;
+                const hasBg = bg && bg !== 'transparent' && bg !== 'rgba(0, 0, 0, 0)';
+                const borderRadius = parseFloat(style.borderRadius) || 0;
+                const r = Math.round(borderRadius * scale);
+
+                if (hasBg) {
+                    const shadow = style.boxShadow;
+                    const hasShadow = shadow && shadow !== 'none' && !shadow.includes('none');
+                    if (hasShadow) {
+                        ctx.save();
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.04)';
+                        ctx.beginPath();
+                        if (r > 0 && typeof ctx.roundRect === 'function') {
+                            ctx.roundRect(x - 1 * scale, y + 1 * scale, w + 2 * scale, h + 3 * scale, r + 1 * scale);
+                        } else {
+                            ctx.rect(x - 1 * scale, y + 1 * scale, w + 2 * scale, h + 3 * scale);
+                        }
+                        ctx.fill();
+
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+                        ctx.beginPath();
+                        if (r > 0 && typeof ctx.roundRect === 'function') {
+                            ctx.roundRect(x, y + 2 * scale, w, h + 2 * scale, r);
+                        } else {
+                            ctx.rect(x, y + 2 * scale, w, h + 2 * scale);
+                        }
+                        ctx.fill();
+                        ctx.restore();
+                    }
+
+                    ctx.fillStyle = bg;
+                    ctx.beginPath();
+                    if (r > 0 && typeof ctx.roundRect === 'function') {
+                        ctx.roundRect(x, y, w, h, r);
+                    } else if (r > 0) {
+                        const radius = Math.min(r, w / 2, h / 2);
+                        ctx.moveTo(x + radius, y);
+                        ctx.arcTo(x + w, y, x + w, y + h, radius);
+                        ctx.arcTo(x + w, y + h, x, y + h, radius);
+                        ctx.arcTo(x, y + h, x, y, radius);
+                        ctx.arcTo(x, y, x + w, y, radius);
+                        ctx.closePath();
+                    } else {
+                        ctx.rect(x, y, w, h);
+                    }
+                    ctx.fill();
+
+                    // Subtle glassmorphism border ring so white buttons on white backgrounds are clearly defined!
+                    ctx.lineWidth = Math.max(1, 1 * scale);
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+                    ctx.stroke();
+                }
+
+                // Border (exclude buttons, SVGs, and transparent borders)
+                const borderStyle = style.borderStyle;
+                const hasBorder = borderStyle && borderStyle !== 'none' && borderStyle !== 'hidden';
+                const borderWidth = parseFloat(style.borderTopWidth || style.borderWidth) || 0;
+                const borderColor = style.borderTopColor || style.borderColor;
+                if (tag !== 'button' && tag !== 'svg' && hasBorder && borderWidth > 0 && borderColor && borderColor !== 'transparent') {
+                    ctx.lineWidth = borderWidth * scale;
+                    ctx.strokeStyle = borderColor;
+                    ctx.beginPath();
+                    if (r > 0 && typeof ctx.roundRect === 'function') {
+                        ctx.roundRect(x, y, w, h, r);
+                    } else if (r > 0) {
+                        const radius = Math.min(r, w / 2, h / 2);
+                        ctx.moveTo(x + radius, y);
+                        ctx.arcTo(x + w, y, x + w, y + h, radius);
+                        ctx.arcTo(x + w, y + h, x, y + h, radius);
+                        ctx.arcTo(x, y + h, x, y, radius);
+                        ctx.arcTo(x, y, x + w, y, radius);
+                        ctx.closePath();
+                    } else {
+                        ctx.rect(x, y, w, h);
+                    }
+                    ctx.stroke();
+                }
+
+                // 2. If SVG element, draw its vector paths in unified SVG coordinate space
+                if (node.tagName && node.tagName.toLowerCase() === 'svg') {
+                    const resolveColor = (col) => {
+                        if (!col || col === 'none' || col === 'transparent') return 'none';
+                        if (col === 'currentColor') return style.color || '#333333';
+                        return col;
+                    };
+
+                    const nodeFill = node.getAttribute('fill') || (style.fill && style.fill !== 'none' ? style.fill : (node.getAttribute('stroke') ? 'none' : 'currentColor'));
+                    const nodeStroke = node.getAttribute('stroke') || (style.stroke && style.stroke !== 'none' ? style.stroke : 'none');
+                    const nodeStrokeWidth = parseFloat(node.getAttribute('stroke-width')) || parseFloat(style.strokeWidth) || 0;
+
+                    const viewBox = node.getAttribute('viewBox');
+                    let vbW = 24, vbH = 24;
+                    if (viewBox) {
+                        const parts = viewBox.trim().split(/[\\s,]+/).map(Number);
+                        if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                            vbW = parts[2];
+                            vbH = parts[3];
+                        }
+                    }
+
+                    const svgScaleX = w / vbW;
+                    const svgScaleY = h / vbH;
+
+                    for (let child of node.children) {
+                        const cTag = child.tagName ? child.tagName.toLowerCase() : '';
+                        const fillAttr = child.getAttribute('fill') || nodeFill;
+                        const strokeAttr = child.getAttribute('stroke') || nodeStroke;
+                        const strokeWidthAttr = parseFloat(child.getAttribute('stroke-width')) || nodeStrokeWidth;
+
+                        const resolvedFill = resolveColor(fillAttr);
+                        const resolvedStroke = resolveColor(strokeAttr);
+
+                        ctx.save();
+                        // Transform context to match SVG viewBox coordinates exactly
+                        ctx.translate(x, y);
+                        ctx.scale(svgScaleX, svgScaleY);
+
+                        if (resolvedFill !== 'none') {
+                            ctx.fillStyle = resolvedFill;
+                        }
+                        if (resolvedStroke !== 'none' && strokeWidthAttr > 0) {
+                            ctx.strokeStyle = resolvedStroke;
+                            ctx.lineWidth = strokeWidthAttr;
+                            ctx.lineCap = child.getAttribute('stroke-linecap') || node.getAttribute('stroke-linecap') || 'round';
+                            ctx.lineJoin = child.getAttribute('stroke-linejoin') || node.getAttribute('stroke-linejoin') || 'round';
+                        }
+
+                        if (cTag === 'path') {
+                            const d = child.getAttribute('d');
+                            if (d) {
+                                const path = new Path2D(d);
+                                if (resolvedFill !== 'none') ctx.fill(path);
+                                if (resolvedStroke !== 'none' && strokeWidthAttr > 0) ctx.stroke(path);
+                            }
+                        } else if (cTag === 'circle') {
+                            const cx = parseFloat(child.getAttribute('cx')) || 0;
+                            const cy = parseFloat(child.getAttribute('cy')) || 0;
+                            const cr = parseFloat(child.getAttribute('r')) || 0;
+                            ctx.beginPath();
+                            ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+                            if (resolvedFill !== 'none') ctx.fill();
+                            if (resolvedStroke !== 'none' && strokeWidthAttr > 0) ctx.stroke();
+                        } else if (cTag === 'rect') {
+                            const rx = parseFloat(child.getAttribute('x')) || 0;
+                            const ry = parseFloat(child.getAttribute('y')) || 0;
+                            const rw = parseFloat(child.getAttribute('width')) || 0;
+                            const rh = parseFloat(child.getAttribute('height')) || 0;
+                            const rRadius = parseFloat(child.getAttribute('rx')) || 0;
+                            ctx.beginPath();
+                            if (rRadius > 0 && typeof ctx.roundRect === 'function') {
+                                ctx.roundRect(rx, ry, rw, rh, rRadius);
+                            } else {
+                                ctx.rect(rx, ry, rw, rh);
+                            }
+                            if (resolvedFill !== 'none') ctx.fill();
+                            if (resolvedStroke !== 'none' && strokeWidthAttr > 0) ctx.stroke();
+                        } else if (cTag === 'polygon') {
+                            const pointsStr = child.getAttribute('points');
+                            if (pointsStr) {
+                                const pts = pointsStr.trim().split(/[\\s,]+/).map(Number);
+                                ctx.beginPath();
+                                for (let i = 0; i < pts.length; i += 2) {
+                                    if (i === 0) ctx.moveTo(pts[i], pts[i + 1]);
+                                    else ctx.lineTo(pts[i], pts[i + 1]);
+                                }
+                                ctx.closePath();
+                                if (resolvedFill !== 'none') ctx.fill();
+                                if (resolvedStroke !== 'none' && strokeWidthAttr > 0) ctx.stroke();
+                            }
+                        } else if (cTag === 'line') {
+                            const x1 = parseFloat(child.getAttribute('x1')) || 0;
+                            const y1 = parseFloat(child.getAttribute('y1')) || 0;
+                            const x2 = parseFloat(child.getAttribute('x2')) || 0;
+                            const y2 = parseFloat(child.getAttribute('y2')) || 0;
+                            ctx.beginPath();
+                            ctx.moveTo(x1, y1);
+                            ctx.lineTo(x2, y2);
+                            if (resolvedStroke !== 'none' && strokeWidthAttr > 0) ctx.stroke();
+                        }
+                        ctx.restore();
+                    }
+                    ctx.restore();
+                    return;
+                }
+
+                // 3. If input[type="range"], draw the scrubber track and thumb
+                if (node.tagName && node.tagName.toLowerCase() === 'input' && node.type === 'range') {
+                    const min = parseFloat(node.min) || 0;
+                    const max = parseFloat(node.max) || 0;
+                    const val = parseFloat(node.value) || 0;
+                    const ratio = max > min ? (val - min) / (max - min) : 0;
+
+                    const trackY = y + h / 2;
+                    const trackH = Math.max(2 * scale, 3);
+                    ctx.fillStyle = '#cccccc';
+                    ctx.beginPath();
+                    if (typeof ctx.roundRect === 'function') {
+                        ctx.roundRect(x, trackY - trackH / 2, w, trackH, trackH / 2);
+                    } else {
+                        ctx.rect(x, trackY - trackH / 2, w, trackH);
+                    }
+                    ctx.fill();
+
+                    const thumbRadius = Math.max(4 * scale, 6);
+                    const thumbX = x + ratio * w;
+                    ctx.fillStyle = '#555555';
+                    ctx.beginPath();
+                    ctx.arc(thumbX, trackY, thumbRadius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.restore();
+                    return;
+                }
+
+                // 4. Text nodes (handles pure text elements and mixed text nodes)
+                for (const child of node.childNodes) {
+                    if (child.nodeType === Node.TEXT_NODE) {
+                        const rawText = child.nodeValue;
+                        if (rawText && rawText.trim().length > 0) {
+                            const range = document.createRange();
+                            range.selectNode(child);
+                            const tr = range.getBoundingClientRect();
+                            if (tr.width > 0 && tr.height > 0) {
+                                const tx = Math.round((tr.left - containerRect.left) * scale);
+                                const ty = Math.round((tr.top - containerRect.top) * scale);
+                                const th = Math.round(tr.height * scale);
+
+                                const fontSize = Math.max(10, Math.round((parseFloat(style.fontSize) || 13) * scale));
+                                const isMono = (style.fontFamily && style.fontFamily.includes('mono')) || (node.id === 'infoPanel');
+                                const fontFam = isMono ? 'monospace' : 'system-ui, -apple-system, sans-serif';
+                                const fontWeight = style.fontWeight && style.fontWeight !== '400' ? style.fontWeight : 'normal';
+                                ctx.font = `${fontWeight} ${fontSize}px ${fontFam}`;
+                                ctx.fillStyle = style.color || '#333333';
+                                ctx.textBaseline = 'middle';
+                                ctx.textAlign = 'left';
+
+                                const textShadow = style.textShadow;
+                                const hasWhiteOutline = textShadow && textShadow.includes('#fff');
+                                if (hasWhiteOutline) {
+                                    ctx.save();
+                                    ctx.strokeStyle = '#ffffff';
+                                    ctx.lineWidth = 3 * scale;
+                                    ctx.strokeText(rawText.trim(), tx, ty + th / 2);
+                                    ctx.restore();
+                                }
+                                ctx.fillText(rawText.trim(), tx, ty + th / 2);
+                            }
+                        }
+                    }
+                }
+
+                ctx.restore();
+
+                const overflow = style.overflow || '';
+                const overflowY = style.overflowY || '';
+                const shouldClip = (overflow === 'hidden' || overflow === 'auto' || overflowY === 'hidden' || overflowY === 'auto');
+                if (shouldClip) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.rect(x, y, w, h);
+                    ctx.clip();
+                }
+
+                for (let child of node.children) {
+                    drawDomNode(ctx, child, containerRect, scale);
+                }
+
+                if (shouldClip) {
+                    ctx.restore();
+                }
+            };
+
+            const drawOverlaysToCanvas = (ctx, scale = 1) => {
+                const containerRect = container.getBoundingClientRect();
+                const overlays = [labelsContainer, uiContainer, rightSideContainer, helpOverlay];
+                for (const el of overlays) {
+                    if (el) {
+                        drawDomNode(ctx, el, containerRect, scale);
+                    }
+                }
+            };
+
             const captureScreenshot = async (defaultName = 'marimol_structure.png') => {
+                if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                    document.activeElement.blur();
+                }
+                screenshotBtn.style.transform = 'scale(1)';
+                screenshotBtn.style.background = 'rgba(255, 255, 255, 0.7)';
+
                 const dpi = model.get('dpi') || 200;
                 const scale = Math.max(0.5, Math.min(8.0, dpi / 96.0));
                 const origWidth = container.clientWidth;
@@ -649,9 +965,35 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     renderer.render(axesScene, axesCamera);
                 }
 
-                const blobPromise = new Promise((resolve) => {
-                    renderer.domElement.toBlob(resolve, 'image/png');
-                });
+                const includeBgd = model.get('record_include_bgd');
+                const includeUi = model.get('record_include_ui');
+
+                let blobPromise;
+                if (!includeBgd && !includeUi) {
+                    blobPromise = new Promise((resolve) => {
+                        renderer.domElement.toBlob(resolve, 'image/png');
+                    });
+                } else {
+                    const exportCanvas = document.createElement('canvas');
+                    exportCanvas.width = targetWidth;
+                    exportCanvas.height = targetHeight;
+                    const ctx = exportCanvas.getContext('2d');
+
+                    if (includeBgd) {
+                        ctx.fillStyle = model.get('background_color') || '#ffffff';
+                        ctx.fillRect(0, 0, targetWidth, targetHeight);
+                    }
+
+                    ctx.drawImage(renderer.domElement, 0, 0, targetWidth, targetHeight);
+
+                    if (includeUi) {
+                        drawOverlaysToCanvas(ctx, scale);
+                    }
+
+                    blobPromise = new Promise((resolve) => {
+                        exportCanvas.toBlob(resolve, 'image/png');
+                    });
+                }
 
                 // Restore live renderer dimensions
                 renderer.setPixelRatio(origPixelRatio);
@@ -682,20 +1024,15 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         return;
                     }
 
-                    // Fallback for browsers/contexts without File System Access API
-                    let filename = prompt('Enter file name to save:', defaultName);
-                    if (!filename) return;
-                    if (!filename.toLowerCase().endsWith('.png')) {
-                        filename += '.png';
-                    }
+                    // Direct browser download without blocking prompts
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = filename;
+                    a.download = defaultName;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
-                    setTimeout(() => URL.revokeObjectURL(url), 2000);
+                    setTimeout(() => URL.revokeObjectURL(url), 5000);
                 } catch (err) {
                     console.error('Error saving screenshot:', err);
                 }
@@ -733,11 +1070,46 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 renderer.setPixelRatio(targetPixelRatio);
                 renderer.setSize(container.clientWidth, container.clientHeight);
 
-                const stream = renderer.domElement.captureStream ? renderer.domElement.captureStream(Math.max(15, Math.min(60, fps))) : null;
+                const includeBgd = model.get('record_include_bgd');
+                const includeUi = model.get('record_include_ui');
+
+                let stream = null;
+                if (includeBgd || includeUi) {
+                    recordCanvas = document.createElement('canvas');
+                    recordCanvas.width = renderer.domElement.width;
+                    recordCanvas.height = renderer.domElement.height;
+                    recordCanvas.style.position = 'fixed';
+                    recordCanvas.style.top = '-9999px';
+                    recordCanvas.style.left = '-9999px';
+                    recordCanvas.style.width = '1px';
+                    recordCanvas.style.height = '1px';
+                    recordCanvas.style.opacity = '0';
+                    recordCanvas.style.pointerEvents = 'none';
+                    document.body.appendChild(recordCanvas);
+
+                    recordCtx = recordCanvas.getContext('2d');
+                    if (includeBgd) {
+                        recordCtx.fillStyle = model.get('background_color') || '#ffffff';
+                        recordCtx.fillRect(0, 0, recordCanvas.width, recordCanvas.height);
+                    }
+                    recordCtx.drawImage(renderer.domElement, 0, 0);
+                    if (includeUi) {
+                        drawOverlaysToCanvas(recordCtx, targetPixelRatio);
+                    }
+                    stream = recordCanvas.captureStream ? recordCanvas.captureStream(Math.max(15, Math.min(60, fps))) : null;
+                } else {
+                    stream = renderer.domElement.captureStream ? renderer.domElement.captureStream(Math.max(15, Math.min(60, fps))) : null;
+                }
+
                 if (!stream) {
                     console.warn('HTMLCanvasElement.captureStream is not supported in this browser.');
                     renderer.setPixelRatio(origPixelRatioBeforeRecord);
                     renderer.setSize(container.clientWidth, container.clientHeight);
+                    if (recordCanvas && recordCanvas.parentNode) {
+                        recordCanvas.parentNode.removeChild(recordCanvas);
+                    }
+                    recordCanvas = null;
+                    recordCtx = null;
                     return;
                 }
 
@@ -751,6 +1123,11 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     console.warn('Could not initialize MediaRecorder:', err);
                     renderer.setPixelRatio(origPixelRatioBeforeRecord);
                     renderer.setSize(container.clientWidth, container.clientHeight);
+                    if (recordCanvas && recordCanvas.parentNode) {
+                        recordCanvas.parentNode.removeChild(recordCanvas);
+                    }
+                    recordCanvas = null;
+                    recordCtx = null;
                     return;
                 }
 
@@ -791,8 +1168,6 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     clearInterval(recordTimerInterval);
                     recordTimerInterval = null;
                 }
-                renderer.setPixelRatio(origPixelRatioBeforeRecord || window.devicePixelRatio || 1);
-                renderer.setSize(container.clientWidth, container.clientHeight);
                 recordingBadge.style.display = 'none';
                 recordBtn.innerHTML = videoSvg;
                 recordBtn.style.background = 'rgba(255, 255, 255, 0.7)';
@@ -805,7 +1180,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const desc = ext === 'mp4' ? 'MP4 Video (*.mp4)' : 'WebM Video (*.webm)';
                 const defaultName = `marimol_animation.${ext}`;
 
-                // Trigger native file picker synchronously during user gesture!
+                // Trigger native file picker synchronously during user gesture if supported
                 let fileHandlePromise = null;
                 if (typeof window.showSaveFilePicker === 'function') {
                     try {
@@ -840,7 +1215,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                             fileHandle = await fileHandlePromise;
                         } catch (err) {
                             if (err && err.name === 'AbortError') {
-                                return; // User cancelled file picker dialog
+                                return; // User explicitly cancelled file picker dialog
                             }
                             console.warn('showSaveFilePicker rejected or blocked:', err);
                         }
@@ -856,22 +1231,25 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         return;
                     }
 
-                    // Fallback for browsers/contexts without File System Access API
-                    let filename = prompt('Enter file name to save:', defaultName);
-                    if (!filename) return; // User cancelled
-                    if (!filename.toLowerCase().endsWith(`.${ext}`)) {
-                        filename += `.${ext}`;
-                    }
+                    // Direct automatic download
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = filename;
+                    a.download = defaultName;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
-                    setTimeout(() => URL.revokeObjectURL(url), 2000);
+                    setTimeout(() => URL.revokeObjectURL(url), 5000);
                 } catch (err) {
                     console.error('Error saving recorded animation:', err);
+                } finally {
+                    renderer.setPixelRatio(origPixelRatioBeforeRecord || window.devicePixelRatio || 1);
+                    renderer.setSize(container.clientWidth, container.clientHeight);
+                    if (recordCanvas && recordCanvas.parentNode) {
+                        recordCanvas.parentNode.removeChild(recordCanvas);
+                    }
+                    recordCanvas = null;
+                    recordCtx = null;
                 }
             };
 
@@ -905,16 +1283,17 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             measureBtn.style.color = '#333';
             measureBtn.style.background = 'rgba(255, 255, 255, 0.7)';
             measureBtn.style.border = 'none';
+            measureBtn.style.outline = 'none';
             measureBtn.style.backdropFilter = 'blur(10px)';
             measureBtn.style.WebkitBackdropFilter = 'blur(10px)';
             measureBtn.style.borderRadius = '8px';
             measureBtn.style.padding = '8px';
             measureBtn.style.cursor = 'pointer';
             measureBtn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-            measureBtn.style.transition = 'background 0.2s, transform 0.1s';
+            measureBtn.style.transition = 'transform 0.2s, background 0.2s, color 0.2s';
             measureBtn.title = 'Measure Tool (Distance, Angle, Dihedral)';
-            measureBtn.onmouseover = () => { if (!isMeasuring) { measureBtn.style.background = 'rgba(255,255,255,0.9)'; measureBtn.style.transform = 'scale(1.1)'; } };
-            measureBtn.onmouseout = () => { if (!isMeasuring) { measureBtn.style.background = 'rgba(255,255,255,0.7)'; measureBtn.style.transform = 'scale(1)'; } };
+            measureBtn.onmouseover = () => { measureBtn.style.transform = 'scale(1.1)'; if (!isMeasuring) { measureBtn.style.background = 'rgba(255,255,255,0.9)'; } };
+            measureBtn.onmouseout = () => { measureBtn.style.transform = 'scale(1)'; if (!isMeasuring) { measureBtn.style.background = 'rgba(255,255,255,0.7)'; } };
 
             const measureLabel = document.createElement('div');
             measureLabel.style.marginTop = '8px';
@@ -948,19 +1327,20 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             extraDataBtn.style.color = '#333';
             extraDataBtn.style.background = 'rgba(255, 255, 255, 0.7)';
             extraDataBtn.style.border = 'none';
+            extraDataBtn.style.outline = 'none';
             extraDataBtn.style.backdropFilter = 'blur(10px)';
             extraDataBtn.style.WebkitBackdropFilter = 'blur(10px)';
             extraDataBtn.style.borderRadius = '8px';
             extraDataBtn.style.padding = '8px';
             extraDataBtn.style.cursor = 'pointer';
             extraDataBtn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-            extraDataBtn.style.transition = 'background 0.2s, transform 0.1s';
+            extraDataBtn.style.transition = 'transform 0.2s, background 0.2s, color 0.2s';
             extraDataBtn.title = 'Toggle Extra Data';
 
             let isExtraDataOpen = false;
 
-            extraDataBtn.onmouseover = () => { if (!isExtraDataOpen) { extraDataBtn.style.background = 'rgba(255,255,255,0.9)'; extraDataBtn.style.transform = 'scale(1.1)'; } };
-            extraDataBtn.onmouseout = () => { if (!isExtraDataOpen) { extraDataBtn.style.background = 'rgba(255,255,255,0.7)'; extraDataBtn.style.transform = 'scale(1)'; } };
+            extraDataBtn.onmouseover = () => { extraDataBtn.style.transform = 'scale(1.1)'; if (!isExtraDataOpen) { extraDataBtn.style.background = 'rgba(255,255,255,0.9)'; } };
+            extraDataBtn.onmouseout = () => { extraDataBtn.style.transform = 'scale(1)'; if (!isExtraDataOpen) { extraDataBtn.style.background = 'rgba(255,255,255,0.7)'; } };
 
             const extraDataPanel = document.createElement('div');
             extraDataPanel.style.marginTop = '8px';
@@ -993,12 +1373,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (isExtraDataOpen) {
                     extraDataBtn.style.background = '#00acc1';
                     extraDataBtn.style.color = 'white';
-                    extraDataBtn.style.transform = 'scale(1.1)';
                     extraDataPanel.style.display = 'block';
                 } else {
                     extraDataBtn.style.background = 'rgba(255, 255, 255, 0.7)';
                     extraDataBtn.style.color = '#333';
-                    extraDataBtn.style.transform = 'scale(1)';
                     extraDataPanel.style.display = 'none';
                 }
             });
@@ -1117,12 +1495,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (isMeasuring) {
                     measureBtn.style.background = '#e91e63';
                     measureBtn.style.color = 'white';
-                    measureBtn.style.transform = 'scale(1.1)';
                     updateMeasurementUI();
                 } else {
                     measureBtn.style.background = 'rgba(255, 255, 255, 0.7)';
                     measureBtn.style.color = '#333';
-                    measureBtn.style.transform = 'scale(1)';
                     clearMeasurement();
                 }
             });
@@ -1134,13 +1510,13 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     return;
                 }
                 const idx = selectedAtoms[0];
-                const cFrame = model.get('current_frame');
+                const cFrame = model.get('current_frame') || 0;
                 const frames = model.get('data') || [];
-                let positions = [];
-                let species_list = [];
+                let positions = currentPositions || [];
+                let species_list = currentSpecies || [];
                 if (frames.length > 0 && frames[cFrame]) {
-                    positions = frames[cFrame].positions || [];
-                    species_list = frames[cFrame].species || [];
+                    if (frames[cFrame].positions) positions = frames[cFrame].positions;
+                    if (frames[cFrame].species) species_list = frames[cFrame].species;
                 }
 
                 if (idx < 0 || idx >= positions.length) {
@@ -1150,8 +1526,14 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
                 const pos = positions[idx] || [0, 0, 0];
                 const species = species_list[idx] !== undefined ? species_list[idx] : '?';
+                const posStr = `[${pos[0].toFixed(3)}, ${pos[1].toFixed(3)}, ${pos[2].toFixed(3)}]`;
 
-                infoPanel.innerText = `Index:   ${idx}\nSpecies: ${species}\nPos:     [${pos[0].toFixed(3)}, ${pos[1].toFixed(3)}, ${pos[2].toFixed(3)}]`;
+                let html = '<table style="border-collapse: collapse; text-align: left; font-family: monospace; font-size: 12px; color: #333;">';
+                html += `<tr><td style="padding-right: 12px; font-weight: bold; padding-bottom: 2px;">Index:</td><td style="padding-bottom: 2px;">${idx}</td></tr>`;
+                html += `<tr><td style="padding-right: 12px; font-weight: bold; padding-bottom: 2px;">Species:</td><td style="padding-bottom: 2px;">${species}</td></tr>`;
+                html += `<tr><td style="padding-right: 12px; font-weight: bold;">Pos:</td><td>${posStr}</td></tr>`;
+                html += '</table>';
+                infoPanel.innerHTML = html;
                 infoPanel.style.display = 'block';
             }
 
@@ -2016,6 +2398,25 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     renderer.setViewport(10, 10, 80, 80);
                     renderer.render(axesScene, axesCamera);
                 }
+
+                // 3. Composite recording frame if recording with custom background or UI
+                if (isRecording && recordCanvas && recordCtx) {
+                    const rW = recordCanvas.width;
+                    const rH = recordCanvas.height;
+                    const includeBgd = model.get('record_include_bgd');
+                    const includeUi = model.get('record_include_ui');
+                    if (includeBgd) {
+                        recordCtx.fillStyle = model.get('background_color') || '#ffffff';
+                        recordCtx.fillRect(0, 0, rW, rH);
+                    } else {
+                        recordCtx.clearRect(0, 0, rW, rH);
+                    }
+                    recordCtx.drawImage(renderer.domElement, 0, 0, rW, rH);
+                    if (includeUi) {
+                        const targetPixelRatio = renderer.getPixelRatio() || 1;
+                        drawOverlaysToCanvas(recordCtx, targetPixelRatio);
+                    }
+                }
             }
             animate();
 
@@ -2030,6 +2431,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (recordTimerInterval) {
                     clearInterval(recordTimerInterval);
                 }
+                recordCanvas = null;
+                recordCtx = null;
                 if (atomMesh) {
                     atomMesh.dispose();
                     scene.remove(atomMesh);
@@ -2080,6 +2483,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     show_help = traitlets.Bool(True).tag(sync=True)
     recording_tools = traitlets.Bool(False).tag(sync=True)
     dpi = traitlets.Int(200).tag(sync=True)
+    record_include_bgd = traitlets.Bool(False).tag(sync=True)
+    record_include_ui = traitlets.Bool(False).tag(sync=True)
 
 
 STYLES = {
@@ -2132,6 +2537,8 @@ def view_structure(
     show_help: bool = True,
     recording_tools: bool = False,
     dpi: int = 200,
+    record_include_bgd: bool = False,
+    record_include_ui: bool = False,
 ) -> mo.ui.anywidget:
     """
     Visualize a molecule or periodic structure in the notebook.
@@ -2190,6 +2597,10 @@ def view_structure(
         Whether to show screenshot (PNG) and animation video recording (WebM/MP4) tools in the viewer toolbar (default is False).
     dpi : int, optional
         Resolution in dots per inch (DPI) for exported screenshots and video recordings (default is 200).
+    record_include_bgd : bool, optional
+        Whether to include the viewer's background color in exported screenshots and video recordings (default is False, which produces transparent backgrounds).
+    record_include_ui : bool, optional
+        Whether to include viewer UI elements (playback controls, info panels, measurement badges, labels) in exported screenshots and video recordings (default is False).
 
     Returns
     -------
@@ -2252,6 +2663,8 @@ def view_structure(
         show_help=show_help,
         recording_tools=recording_tools,
         dpi=dpi,
+        record_include_bgd=record_include_bgd,
+        record_include_ui=record_include_ui,
     )
 
     return mo.ui.anywidget(widget)

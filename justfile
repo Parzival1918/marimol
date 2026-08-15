@@ -16,7 +16,7 @@ alias edit-docs := docs-edit
 
 # Export documentation notebook to static HTML
 docs-build:
-    uv run marimo export html docs/docs.py -o docs/index.html --no-include-code
+    uv run marimo export html docs/docs.py -o docs/index.html --no-include-code --force
 
 alias build-docs := docs-build
 

@@ -175,6 +175,8 @@ All viewer functions (`view_structure`, `view_ase`, `view_pymatgen`, `view_cspy`
 | `show_help` | `bool` | `True` | Show the help button and enable the <kbd>H</kbd> interactive controls overlay. |
 | `recording_tools` | `bool` | `False` | Show screenshot (PNG) and video recording (WebM/MP4) buttons in the viewer toolbar. |
 | `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. |
+| `record_include_bgd` | `bool` | `False` | Include the background color in exported screenshots and video recordings (default is `False` for transparent backgrounds). |
+| `record_include_ui` | `bool` | `False` | Include all viewer UI elements (playback controls, info panel, measurements, labels) in exported screenshots and video recordings. |
 
 ---
 

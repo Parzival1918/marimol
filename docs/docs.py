@@ -154,6 +154,8 @@ def _():
     | `show_help` | `bool` | `True` | Whether to show the help button and enable the 'h' interaction help overlay. |
     | `recording_tools` | `bool` | `False` | Whether to show screenshot (PNG) and animation video recording (WebM/MP4) buttons in the viewer toolbar. |
     | `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. |
+    | `record_include_bgd` | `bool` | `False` | Whether to include the viewer's background color in exported screenshots and video recordings (default is `False` for transparent backgrounds). |
+    | `record_include_ui` | `bool` | `False` | Whether to include all viewer UI elements (playback controls, info panels, measurements, labels) in exported screenshots and video recordings. |
 
     ### Custom Style Dictionaries
 
@@ -494,7 +496,7 @@ def _():
     mo.md(r"""
     ### 5. CSPY Integration: Crystal Structure Generation with `CrystalGenerator`
 
-    Visualizing predicted molecular crystal candidates generated with **mol-cspy**'s `CrystalGenerator` (`cspy.crystal.generate_crystal.CrystalGenerator`). Multiple candidate crystal structures are loaded as a collection with interactive trajectory navigation (`multi_traj=False`, `trajectory_slider=True`), and automated crystallographic data computation (`compute_extra_data=True`). Screen captures and recordings can be taken (`recording_tools=True`).
+    Visualizing predicted molecular crystal candidates generated with **mol-cspy**'s `CrystalGenerator` (`cspy.crystal.generate_crystal.CrystalGenerator`). Multiple candidate crystal structures are loaded as a collection with interactive trajectory navigation (`multi_traj=False`, `trajectory_slider=True`), and automated crystallographic data computation (`compute_extra_data=True`). Screen captures and recordings can be taken (`recording_tools=True`), and the background and UI elements are also included in the saved files (`record_include_bgd=True` and `record_include_ui=True`).
     """)
     return
 
@@ -540,6 +542,8 @@ def _():
         viewer_outline=True,
         fog=True,
         recording_tools=True,
+        record_include_bgd=True,
+        record_include_ui=True,
     )
     ```
     """)
@@ -573,6 +577,8 @@ def _():
         viewer_outline=True,
         fog=True,
         recording_tools=True,
+        record_include_bgd=False,
+        record_include_ui=True,
     )
 
     mo.vstack([_code, _viewer])
