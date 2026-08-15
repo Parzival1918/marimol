@@ -114,6 +114,8 @@ def _():
       - Click the ruler button again or click empty canvas space to exit measurement mode.
     - **Extra Data Drawer**:
       - Click the **List icon** in the top-right overlay to expand the metadata drawer, showing properties such as unit cell volume, density, lattice parameters ($a, b, c, \alpha, \beta, \gamma$), atom counts, or custom calculation results.
+    - **Help & Controls Overlay**:
+      - Press the <kbd>H</kbd> key while hovering over the viewer or click the **Question Mark icon** in the top-right overlay to display an interactive summary of all navigation, selection, measuring, trajectory, and axis controls.
     - **Trajectory Controls**:
       - When visualizing a list of frames, a media player overlay appears with buttons for First, Previous, Play/Pause, Next, and Last frame, as well as an optional scrubbable frame slider.
 
@@ -146,6 +148,7 @@ def _():
     | `traj_fps` | `float` | `10.0` | Playback speed in frames per second for trajectory animations. |
     | `trajectory_slider` | `bool` | `False` | Displays a scrubbable timeline slider in the trajectory control bar. |
     | `compute_extra_data` | `bool` | `False` | Automatically computes physical/crystallographic properties (density, volume, lattice lengths & angles, atom count, molecular weight) for the info drawer. |
+    | `show_help` | `bool` | `True` | Whether to show the help button and enable the 'h' interaction help overlay. |
 
     ### Custom Style Dictionaries
 

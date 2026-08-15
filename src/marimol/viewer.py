@@ -334,6 +334,173 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             uiContainer.addEventListener('click', (e) => e.stopPropagation());
             infoPanel.addEventListener('click', (e) => e.stopPropagation());
 
+            // --- Help Button UI ---
+            let isHelpOpen = false;
+
+            const helpContainer = document.createElement('div');
+            helpContainer.style.display = model.get('show_help') ? 'flex' : 'none';
+            helpContainer.style.flexDirection = 'column';
+            helpContainer.style.alignItems = 'flex-end';
+            helpContainer.style.pointerEvents = 'auto';
+
+            const helpSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+            const helpBtn = document.createElement('button');
+            helpBtn.innerHTML = helpSvg;
+            helpBtn.style.color = '#333';
+            helpBtn.style.background = 'rgba(255, 255, 255, 0.7)';
+            helpBtn.style.border = 'none';
+            helpBtn.style.backdropFilter = 'blur(10px)';
+            helpBtn.style.WebkitBackdropFilter = 'blur(10px)';
+            helpBtn.style.borderRadius = '8px';
+            helpBtn.style.padding = '8px';
+            helpBtn.style.cursor = 'pointer';
+            helpBtn.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+            helpBtn.style.transition = 'background 0.2s, transform 0.1s';
+            helpBtn.title = 'Help & Controls (H)';
+
+            helpBtn.onmouseover = () => { if (!isHelpOpen) { helpBtn.style.background = 'rgba(255,255,255,0.9)'; helpBtn.style.transform = 'scale(1.1)'; } };
+            helpBtn.onmouseout = () => { if (!isHelpOpen) { helpBtn.style.background = 'rgba(255,255,255,0.7)'; helpBtn.style.transform = 'scale(1)'; } };
+            helpContainer.appendChild(helpBtn);
+            helpContainer.addEventListener('click', (e) => e.stopPropagation());
+
+            // --- Help Overlay Modal ---
+            const helpOverlay = document.createElement('div');
+            helpOverlay.style.position = 'absolute';
+            helpOverlay.style.top = '50%';
+            helpOverlay.style.left = '50%';
+            helpOverlay.style.transform = 'translate(-50%, -50%)';
+            helpOverlay.style.zIndex = '100';
+            helpOverlay.style.display = 'none';
+            helpOverlay.style.maxHeight = 'calc(100% - 30px)';
+            helpOverlay.style.maxWidth = 'calc(100% - 30px)';
+            helpOverlay.style.width = '360px';
+            helpOverlay.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+            helpOverlay.style.backdropFilter = 'blur(12px)';
+            helpOverlay.style.WebkitBackdropFilter = 'blur(12px)';
+            helpOverlay.style.borderRadius = '12px';
+            helpOverlay.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.1)';
+            helpOverlay.style.border = '1px solid rgba(0, 0, 0, 0.1)';
+            helpOverlay.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            helpOverlay.style.fontSize = '13px';
+            helpOverlay.style.color = '#222';
+            helpOverlay.style.padding = '14px 18px';
+            helpOverlay.style.boxSizing = 'border-box';
+            helpOverlay.style.overflowY = 'auto';
+            helpOverlay.style.pointerEvents = 'auto';
+            container.appendChild(helpOverlay);
+
+            helpOverlay.addEventListener('click', (e) => e.stopPropagation());
+            helpOverlay.addEventListener('mousedown', (e) => e.stopPropagation());
+            helpOverlay.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+            const updateHelpContent = () => {
+                const showAxes = model.get('show_axes');
+                const measuring = model.get('measuring_tool');
+                const frames = model.get('data') || [];
+                const isTrajectory = frames.length > 1;
+                const cFrame = model.get('current_frame') || 0;
+                const fData = isTrajectory ? (frames[cFrame] || {}) : (frames[0] || {});
+                const hasExtraData = fData.extra_data && Object.keys(fData.extra_data).length > 0;
+
+                const kbdStyle = 'display:inline-block; padding: 2px 6px; font-family: monospace; font-size: 11px; font-weight: 600; color: #333; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; box-shadow: 0 1px 1px rgba(0,0,0,0.1); margin-right: 4px;';
+                const sectionTitleStyle = 'font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: #666; margin-top: 10px; margin-bottom: 6px; border-bottom: 1px solid rgba(0,0,0,0.06); padding-bottom: 2px;';
+                const rowStyle = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;';
+
+                let html = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 8px;">
+                        <div style="font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 6px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00acc1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                            <span>Viewer Controls</span>
+                        </div>
+                        <button id="marimol-help-close-btn" style="background: none; border: none; cursor: pointer; color: #888; font-size: 18px; font-weight: bold; line-height: 1; padding: 2px 6px; border-radius: 4px; transition: color 0.15s, background 0.15s;">✕</button>
+                    </div>
+                `;
+
+                // Navigation Section
+                html += `<div style="${sectionTitleStyle}">Navigation</div>`;
+                html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">Left Click</span> + Drag</span><span style="color:#555;">Rotate</span></div>`;
+                html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">Right Click</span> + Drag</span><span style="color:#555;">Pan</span></div>`;
+                html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">Scroll Wheel</span></span><span style="color:#555;">Zoom</span></div>`;
+
+                // Selection Section
+                html += `<div style="${sectionTitleStyle}">Atom Selection</div>`;
+                html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">Click</span> on Atom</span><span style="color:#555;">Select & Inspect</span></div>`;
+                html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">Shift</span> + <span style="${kbdStyle}">Click</span></span><span style="color:#555;">Multi-select</span></div>`;
+                html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">Click</span> Background</span><span style="color:#555;">Deselect</span></div>`;
+
+                // Axis Snapping (Conditional)
+                if (showAxes) {
+                    html += `<div style="${sectionTitleStyle}">Axis Snapping</div>`;
+                    html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">Click</span> <span style="color:#ff4444; font-weight:bold;">X</span> / <span style="color:#2e7d32; font-weight:bold;">Y</span> / <span style="color:#1565c0; font-weight:bold;">Z</span></span><span style="color:#555;">Snap view to axis</span></div>`;
+                }
+
+                // Measuring Tool (Conditional)
+                if (measuring) {
+                    html += `<div style="${sectionTitleStyle}">Measuring Tool</div>`;
+                    html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">Ruler Icon</span></span><span style="color:#555;">Toggle measuring</span></div>`;
+                    html += `<div style="${rowStyle}"><span>Click 2 atoms</span><span style="color:#555;">Distance (Å)</span></div>`;
+                    html += `<div style="${rowStyle}"><span>Click 3 atoms</span><span style="color:#555;">Angle (°)</span></div>`;
+                    html += `<div style="${rowStyle}"><span>Click 4 atoms</span><span style="color:#555;">Dihedral (°)</span></div>`;
+                }
+
+                // Trajectory Controls (Conditional)
+                if (isTrajectory) {
+                    html += `<div style="${sectionTitleStyle}">Trajectory</div>`;
+                    html += `<div style="${rowStyle}"><span>Play / Step buttons</span><span style="color:#555;">Playback frames</span></div>`;
+                    if (model.get('trajectory_slider')) {
+                        html += `<div style="${rowStyle}"><span>Slider</span><span style="color:#555;">Scrub frames</span></div>`;
+                    }
+                }
+
+                // Extra Data (Conditional)
+                if (hasExtraData) {
+                    html += `<div style="${sectionTitleStyle}">Structure Info</div>`;
+                    html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">List Icon</span></span><span style="color:#555;">Toggle metadata</span></div>`;
+                }
+
+                // Keyboard Shortcuts
+                html += `<div style="${sectionTitleStyle}">Shortcuts</div>`;
+                html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">H</span></span><span style="color:#555;">Toggle help overlay</span></div>`;
+                html += `<div style="${rowStyle}"><span><span style="${kbdStyle}">Esc</span></span><span style="color:#555;">Close help</span></div>`;
+
+                helpOverlay.innerHTML = html;
+
+                const closeBtn = helpOverlay.querySelector('#marimol-help-close-btn');
+                if (closeBtn) {
+                    closeBtn.onclick = () => toggleHelp(false);
+                    closeBtn.onmouseover = () => { closeBtn.style.color = '#000'; closeBtn.style.background = 'rgba(0,0,0,0.06)'; };
+                    closeBtn.onmouseout = () => { closeBtn.style.color = '#888'; closeBtn.style.background = 'none'; };
+                }
+            };
+
+            const toggleHelp = (forceState) => {
+                if (!model.get('show_help')) {
+                    isHelpOpen = false;
+                    helpOverlay.style.display = 'none';
+                    helpBtn.style.background = 'rgba(255, 255, 255, 0.7)';
+                    helpBtn.style.color = '#333';
+                    helpBtn.style.transform = 'scale(1)';
+                    return;
+                }
+                isHelpOpen = (typeof forceState === 'boolean') ? forceState : !isHelpOpen;
+                if (isHelpOpen) {
+                    updateHelpContent();
+                    helpOverlay.style.display = 'block';
+                    helpBtn.style.background = '#00acc1';
+                    helpBtn.style.color = 'white';
+                    helpBtn.style.transform = 'scale(1.1)';
+                } else {
+                    helpOverlay.style.display = 'none';
+                    helpBtn.style.background = 'rgba(255, 255, 255, 0.7)';
+                    helpBtn.style.color = '#333';
+                    helpBtn.style.transform = 'scale(1)';
+                }
+            };
+
+            helpBtn.addEventListener('click', () => {
+                toggleHelp();
+            });
+
             // --- Measuring Tool UI ---
             let isMeasuring = false;
             let measureSelection = []; // array of {index, pos: THREE.Vector3}
@@ -432,7 +599,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
             // Note: Since infoPanel has margin-top: auto, we want extraData to be above infoPanel in the DOM.
             // rightSideContainer currently has infoPanel appended first.
-            // We should insert measureContainer and extraDataContainer BEFORE infoPanel so they appear at the top!
+            // We should insert helpContainer, measureContainer and extraDataContainer BEFORE infoPanel so they appear at the top!
+            rightSideContainer.insertBefore(helpContainer, infoPanel);
             rightSideContainer.insertBefore(measureContainer, infoPanel);
             rightSideContainer.insertBefore(extraDataContainer, infoPanel);
             container.appendChild(rightSideContainer);
@@ -462,6 +630,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (!show && isMeasuring) {
                     measureBtn.click(); // toggle off
                 }
+                if (isHelpOpen) updateHelpContent();
             });
 
             function clearMeasurement() {
@@ -1102,6 +1271,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         controls.update();
                     }
                 }
+
+                if (isHelpOpen) {
+                    updateHelpContent();
+                }
             }
 
             // Watch for changes from Python
@@ -1118,6 +1291,16 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             model.on("change:fog_strength", () => updateScene(true));
             model.on("change:draw_outlines", () => updateScene(true));
             model.on("change:draw_labels", () => updateScene(true));
+            model.on("change:show_axes", () => {
+                if (isHelpOpen) updateHelpContent();
+            });
+            model.on("change:show_help", () => {
+                const show = model.get('show_help');
+                helpContainer.style.display = show ? 'flex' : 'none';
+                if (!show && isHelpOpen) {
+                    toggleHelp(false);
+                }
+            });
             model.on("change:multi_traj", () => {
                 const showPlay = model.get('multi_traj') !== false;
                 btnPlay.style.display = showPlay ? 'flex' : 'none';
@@ -1129,6 +1312,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const frames = model.get('data') || [];
                 const isTrajectory = frames.length > 1;
                 frameSlider.style.display = (model.get('trajectory_slider') && isTrajectory) ? 'block' : 'none';
+                if (isHelpOpen) updateHelpContent();
             });
             model.on("change:traj_fps", () => {
                 if (isPlaying) {
@@ -1225,6 +1409,29 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             });
             resizeObserver.observe(container);
 
+            // Handle KeyDown for Help Overlay Toggle
+            let isContainerHovered = false;
+            container.addEventListener('mouseenter', () => { isContainerHovered = true; });
+            container.addEventListener('mouseleave', () => { isContainerHovered = false; });
+
+            const handleKeyDown = (e) => {
+                if (!model.get('show_help')) return;
+                if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
+
+                const isTargetInside = container.contains(e.target) || isContainerHovered || document.activeElement === container;
+                if (!isTargetInside) return;
+
+                if ((e.key === 'h' || e.key === 'H') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    e.preventDefault();
+                    toggleHelp();
+                } else if (e.key === 'Escape' && isHelpOpen) {
+                    e.preventDefault();
+                    toggleHelp(false);
+                }
+            };
+
+            window.addEventListener('keydown', handleKeyDown);
+
             // Handle Click (Picking or Axis Snapping)
             let pointerDownPos = { x: 0, y: 0 };
             container.addEventListener('pointerdown', (e) => {
@@ -1232,6 +1439,11 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             });
 
             container.addEventListener('click', (event) => {
+                if (isHelpOpen) {
+                    toggleHelp(false);
+                    return;
+                }
+
                 const dx = event.clientX - pointerDownPos.x;
                 const dy = event.clientY - pointerDownPos.y;
                 if (Math.sqrt(dx * dx + dy * dy) > 5) return;
@@ -1409,6 +1621,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             return () => {
                 cancelAnimationFrame(animationId);
                 resizeObserver.disconnect();
+                window.removeEventListener('keydown', handleKeyDown);
                 if (atomMesh) {
                     atomMesh.dispose();
                     scene.remove(atomMesh);
@@ -1456,6 +1669,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     multi_traj = traitlets.Bool(True).tag(sync=True)
     traj_fps = traitlets.Float(10.0).tag(sync=True)
     trajectory_slider = traitlets.Bool(False).tag(sync=True)
+    show_help = traitlets.Bool(True).tag(sync=True)
 
 
 STYLES = {
@@ -1505,6 +1719,7 @@ def view_structure(
     traj_fps: float = 10.0,
     trajectory_slider: bool = False,
     compute_extra_data: bool = False,
+    show_help: bool = True,
 ) -> mo.ui.anywidget:
     """
     Visualize a molecule or periodic structure in the notebook.
@@ -1557,6 +1772,8 @@ def view_structure(
     compute_extra_data : bool, optional
         Whether to compute and display extra data (number of atoms, atomic weight for non-periodic;
         density, volume, number of atoms, and cell vector lengths for periodic structures). Default is False.
+    show_help : bool, optional
+        Whether to show the help button and enable the 'h' interaction help overlay (default is True).
 
     Returns
     -------
@@ -1616,6 +1833,7 @@ def view_structure(
         multi_traj=multi_traj,
         traj_fps=traj_fps,
         trajectory_slider=trajectory_slider,
+        show_help=show_help,
     )
 
     return mo.ui.anywidget(widget)
