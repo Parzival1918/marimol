@@ -58,7 +58,7 @@ def _():
     # For Pymatgen Structure objects
     from marimol import view_pymatgen
 
-    # For CSPY Molecule or Crystal objects
+    # For mol-cspy Molecule or Crystal objects
     from marimol import view_cspy
     ```
 
@@ -176,7 +176,7 @@ def _():
 
     ## Data structure
 
-    **marimol** operates natively on a clean dictionary format. If you are not using ASE, Pymatgen, or CSPY, you can pass structures directly using standard Python dictionaries:
+    **marimol** operates natively on a clean dictionary format. If you are not using ASE, Pymatgen, or mol-cspy, you can pass structures directly using standard Python dictionaries:
 
     ```python
     structure_dict = {
@@ -501,7 +501,7 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### 5. CSPY Integration: Crystal Structure Generation with `CrystalGenerator`
+    ### 5. mol-cspy Integration: Crystal Structure Generation with `CrystalGenerator`
 
     Visualizing predicted molecular crystal candidates generated with **mol-cspy**'s `CrystalGenerator` (`cspy.crystal.generate_crystal.CrystalGenerator`). Multiple candidate crystal structures are loaded as a collection with interactive trajectory navigation (`multi_traj=False`, `trajectory_slider=True`), and automated crystallographic data computation (`compute_extra_data=True`). Screen captures and recordings can be taken (`recording_tools=True`), and the background and UI elements are also included in the saved files (`record_include_bgd=True` and `record_include_ui=True`).
     """)
