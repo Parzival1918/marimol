@@ -586,7 +586,6 @@ def _():
         recording_tools=True,
         record_include_bgd=True,
         record_include_ui=True,
-        draw_outlines=True,
     )
 
     mo.vstack([_code, _viewer])
