@@ -300,7 +300,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             uiContainer.appendChild(sliderGroup);
             container.appendChild(uiContainer);
 
-            // --- Right Side UI (Container for Measure, Extra Data, Info Panel) ---
+            // --- Right Side UI (Container for Top-Right Scrollable Tools & Bottom-Right Info Panel) ---
             const rightSideContainer = document.createElement('div');
             rightSideContainer.style.position = 'absolute';
             rightSideContainer.style.top = '15px';
@@ -313,7 +313,31 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             rightSideContainer.style.gap = '8px';
             rightSideContainer.style.pointerEvents = 'none';
 
-            // --- Atom Info Panel ---
+            // Top-right section containing toolbar buttons and expandable panels (scrolls if space is limited)
+            const topRightContainer = document.createElement('div');
+            topRightContainer.style.display = 'flex';
+            topRightContainer.style.flexDirection = 'column';
+            topRightContainer.style.alignItems = 'flex-end';
+            topRightContainer.style.gap = '8px';
+            topRightContainer.style.pointerEvents = 'none';
+            topRightContainer.style.overflowY = 'auto';
+            topRightContainer.style.overflowX = 'hidden';
+            topRightContainer.style.padding = '0 4px 6px 4px';
+            topRightContainer.style.boxSizing = 'border-box';
+            topRightContainer.style.flexShrink = '1';
+            topRightContainer.style.minHeight = '0';
+            topRightContainer.style.scrollbarWidth = 'thin';
+            topRightContainer.style.scrollbarColor = 'rgba(0, 0, 0, 0.25) transparent';
+
+            topRightContainer.addEventListener('wheel', (e) => {
+                if (topRightContainer.scrollHeight > topRightContainer.clientHeight) {
+                    e.stopPropagation();
+                }
+            }, { passive: true });
+
+            rightSideContainer.appendChild(topRightContainer);
+
+            // --- Atom Info Panel (Stationary at Bottom-Right) ---
             const infoPanel = document.createElement('div');
             infoPanel.style.marginTop = 'auto'; // push to the bottom
             infoPanel.style.pointerEvents = 'auto';
@@ -328,6 +352,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             infoPanel.style.fontSize = '12px';
             infoPanel.style.color = '#333';
             infoPanel.style.whiteSpace = 'pre';
+            infoPanel.style.flexShrink = '0';
             rightSideContainer.appendChild(infoPanel);
 
             // Prevent clicks on UI panels from bubbling up and clearing the selection
@@ -916,8 +941,6 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             extraDataContainer.style.flexDirection = 'column';
             extraDataContainer.style.alignItems = 'flex-end';
             extraDataContainer.style.pointerEvents = 'auto';
-            extraDataContainer.style.flexShrink = '1';
-            extraDataContainer.style.minHeight = '0';
 
             const extraDataBtn = document.createElement('button');
             const listSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>`;
@@ -941,6 +964,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
             const extraDataPanel = document.createElement('div');
             extraDataPanel.style.marginTop = '8px';
+            extraDataPanel.style.marginBottom = '4px';
             extraDataPanel.style.padding = '12px';
             extraDataPanel.style.background = 'rgba(255, 255, 255, 0.7)';
             extraDataPanel.style.backdropFilter = 'blur(10px)';
@@ -951,18 +975,15 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             extraDataPanel.style.color = '#333';
             extraDataPanel.style.display = 'none';
             extraDataPanel.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-            extraDataPanel.style.overflowY = 'auto';
-            extraDataPanel.style.flexShrink = '1';
-            extraDataPanel.style.minHeight = '0';
+            extraDataPanel.style.flexShrink = '0';
 
             extraDataContainer.appendChild(extraDataBtn);
             extraDataContainer.appendChild(extraDataPanel);
 
-            // Note: Since infoPanel has margin-top: auto, we want toolbar buttons above infoPanel in the DOM.
-            rightSideContainer.insertBefore(helpContainer, infoPanel);
-            rightSideContainer.insertBefore(captureContainer, infoPanel);
-            rightSideContainer.insertBefore(measureContainer, infoPanel);
-            rightSideContainer.insertBefore(extraDataContainer, infoPanel);
+            topRightContainer.appendChild(helpContainer);
+            topRightContainer.appendChild(captureContainer);
+            topRightContainer.appendChild(measureContainer);
+            topRightContainer.appendChild(extraDataContainer);
             container.appendChild(rightSideContainer);
 
             extraDataContainer.addEventListener('click', (e) => e.stopPropagation());
