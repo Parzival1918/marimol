@@ -20,6 +20,10 @@ docs-build:
 
 alias build-docs := docs-build
 
+# View examples with marimo
+examples:
+    uv run marimo edit examples
+
 # Run unit tests with pytest
 test:
     uv run pytest

@@ -43,7 +43,7 @@ cspy = { git = "https://gitlab.com/mol-cspy/mol-cspy", branch = "main" }
 [tool.ruff]
 line-length = 120
 target-version = "py311"
-extend-exclude = ["docs"]
+extend-exclude = ["docs", "examples"]
 
 [tool.ruff.lint]
 select = [

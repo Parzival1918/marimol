@@ -234,6 +234,12 @@ def _():
     ## Examples
 
     Below are examples showcasing different data formats, visual styles, and viewer capabilities. Click **View Code** on any example to expand its implementation.
+
+    You can also run and explore dedicated interactive example notebooks in the `examples/` folder by running:
+
+    ```bash
+    uv run just examples
+    ```
     """)
     return
 
@@ -721,12 +727,18 @@ def _():
     uv run just test
     ```
 
-    ### 5. Previewing documentation
+    ### 5. Previewing documentation & examples
 
     To launch and edit the interactive documentation notebook locally:
 
     ```bash
     uv run just docs-edit
+    ```
+
+    To launch and browse the interactive example notebooks:
+
+    ```bash
+    uv run just examples
     ```
 
     To test exporting the documentation to HTML:

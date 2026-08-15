@@ -6,6 +6,10 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+<p align="center">
+  <video src="recordings/benzene.mp4" controls autoplay loop muted playsinline width="100%"></video>
+</p>
+
 ---
 
 **marimol** provides a clean, responsive, and interactive 3D WebGL molecular viewer built with [Three.js](https://threejs.org/) and [anywidget](https://anywidget.dev/). It is designed from the ground up for [marimo](https://marimo.io/) notebooks, enabling **two-way reactivity**: clicking atoms or playing through trajectories in the 3D viewport immediately updates downstream reactive notebook cells in real time.
@@ -221,6 +225,27 @@ view_structure(data, style=custom_style)
 
 ---
 
+## 🚀 Interactive Examples
+
+Interactive marimo example notebooks demonstrating molecules, trajectories, crystals, and presets are provided in the [`examples/`](examples/) directory:
+
+```bash
+# Launch interactive marimo editor for all examples
+uv run just examples
+
+# Or edit a specific example notebook
+uv run marimo edit examples/01_interactive_molecule_viewer.py
+```
+
+| Notebook | Description |
+| :--- | :--- |
+| [`01_interactive_molecule_viewer.py`](examples/01_interactive_molecule_viewer.py) | Molecule visualization with UI controls (styles, themes, outlines, auto-spin) and two-way reactivity. |
+| [`02_trajectory_and_animation.py`](examples/02_trajectory_and_animation.py) | Multi-frame vibrational trajectory with media controls, scrubbable timeline, and video recording. |
+| [`03_crystal_structures_and_extra_data.py`](examples/03_crystal_structures_and_extra_data.py) | Periodic crystal lattices with unit cell wireframes, depth fog, and automated crystallographic metrics. |
+| [`04_toml_presets_and_themes.py`](examples/04_toml_presets_and_themes.py) | Reusable visual presets loaded from TOML via `config` with parameter overrides. |
+
+---
+
 ## 📝 Documentation
 
 To run the interactive marimo documentation app locally:
@@ -283,12 +308,18 @@ Execute the test suite using `pytest`:
 uv run just test
 ```
 
-### 5. Previewing documentation
+### 5. Previewing documentation & examples
 
 To launch and edit the interactive documentation notebook locally:
 
 ```bash
 uv run just docs-edit
+```
+
+To launch and browse the interactive example notebooks:
+
+```bash
+uv run just examples
 ```
 
 To test exporting the documentation to HTML:
