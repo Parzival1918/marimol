@@ -12,6 +12,8 @@
 
 Supports visualization of **ASE**, **Pymatgen**, **mol-cspy**, and native Python dictionaries with zero configuration.
 
+For a more in depth documentation which includes interactive examples see: [marimol.naujordep.com](https://marimol.naujordep.com).
+
 ---
 
 ## ✨ Features
@@ -200,12 +202,6 @@ To run the interactive marimo documentation app locally:
 
 ```bash
 uv run just docs-edit
-```
-
-To run unit tests:
-
-```bash
-uv run just test
 ```
 
 ---
