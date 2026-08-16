@@ -68,6 +68,14 @@ def _(mo):
         label="📦 Structures per Space Group:",
     )
 
+    clip_distance_slider = mo.ui.slider(
+        start=0.0,
+        stop=30.0,
+        step=0.5,
+        value=0.0,
+        label="✂️ Clip Distance (0 = disabled):",
+    )
+
     style_dropdown = mo.ui.dropdown(
         options=["ball-and-stick", "vdw", "wireframe"],
         value="ball-and-stick",
@@ -78,10 +86,17 @@ def _(mo):
         [
             xyz_input,
             mo.hstack([sg_input, z_prime_slider], justify="space-between"),
-            mo.hstack([n_per_sg_slider, style_dropdown], justify="space-between"),
+            mo.hstack([n_per_sg_slider, clip_distance_slider, style_dropdown], justify="space-between"),
         ]
     )
-    return n_per_sg_slider, sg_input, style_dropdown, xyz_input, z_prime_slider
+    return (
+        clip_distance_slider,
+        n_per_sg_slider,
+        sg_input,
+        style_dropdown,
+        xyz_input,
+        z_prime_slider,
+    )
 
 
 @app.cell
@@ -89,7 +104,7 @@ def _(
     Crystal,
     CrystalGenerator,
     Molecule,
-    e,
+    clip_distance_slider,
     mo,
     n_per_sg_slider,
     re,
@@ -101,7 +116,7 @@ def _(
 ):
     # 1. Parse molecule from user-provided XYZ string
     xyz_text = xyz_input.value.strip()
-    xyz_valid = False
+    parse_error = None
     try:
         lines = [line.strip() for line in xyz_text.splitlines() if line.strip()]
         if not lines:
@@ -114,85 +129,81 @@ def _(
 
         mol = Molecule.from_xyz_string(formatted_xyz)
         mol.guess_bonds()
-        xyz_valid = True
-    except Exception as e:
-        exception = e
+    except Exception as err:
+        parse_error = str(err)
+        mol = None
 
-    if not xyz_valid:
-        viewer = mo.md(f"⚠️ **Error parsing XYZ data**: `{e}`. Please check the XYZ format.")
-    else:
-        # 2. Parse space groups (validating range 1 to 230)
-        raw_tokens = re.findall(r"\d+", sg_input.value)
-        valid_space_groups = []
-        invalid_tokens = []
-        for token in raw_tokens:
-            sg_num = int(token)
-            if 1 <= sg_num <= 230:
-                if sg_num not in valid_space_groups:
-                    valid_space_groups.append(sg_num)
-            else:
-                invalid_tokens.append(token)
+    mo.stop(mol is None, mo.md(f"⚠️ **Error parsing XYZ data**: `{parse_error}`. Please check the XYZ format."))
 
-        if not valid_space_groups:
-            valid_space_groups = [2, 14]
+    # 2. Parse space groups (validating range 1 to 230)
+    raw_tokens = re.findall(r"([+-]?\d+)", sg_input.value)
+    valid_space_groups = []
+    invalid_tokens = []
+    for token in raw_tokens:
+        sg_num = int(token)
+        if 1 <= sg_num <= 230:
+            if sg_num not in valid_space_groups:
+                valid_space_groups.append(sg_num)
+        else:
+            invalid_tokens.append(token)
 
-        z_prime = z_prime_slider.value
-        n_per_sg = n_per_sg_slider.value
+    if not valid_space_groups:
+        valid_space_groups = [2, 14]
 
-        # 3. Generate candidate crystals for each selected space group
-        crystals = []
-        for sg in valid_space_groups:
-            try:
-                generator = CrystalGenerator([mol] * z_prime, space_group=sg)
-                count = 0
-                for seed in range(1, 50):
-                    candidate = generator.generate(seed)
-                    if candidate is not None:
-                        crystals.append(candidate)
-                        count += 1
-                        if count >= n_per_sg:
-                            break
-            except Exception:
-                continue
+    z_prime = z_prime_slider.value
+    n_per_sg = n_per_sg_slider.value
 
-        # 4. Define custom callable to extract space group and asymmetric unit count
-        def extract_crystal_metadata(c: Crystal) -> dict:
-            return {
-                "space group": f"{c.space_group.international_tables_number} ({c.space_group.symbol})",
-                "Z' (asym molecules)": len(c.asym_mols()),
-            }
+    # 3. Generate candidate crystals for each selected space group
+    crystals = []
+    for sg in valid_space_groups:
+        try:
+            generator = CrystalGenerator([mol] * z_prime, space_group=sg)
+            count = 0
+            seed = 1
+            while count != n_per_sg:
+                candidate = generator.generate(seed)
+                if candidate is not None:
+                    crystals.append(candidate)
+                    count += 1
+                seed += 1
+        except Exception as e:
+            print(e)
+            continue
 
-        # 5. Visualize the generated structures
-        viewer = view_cspy(
-            crystals if crystals else mol,
-            extra_data=extract_crystal_metadata if crystals else None,
-            style=style_dropdown.value,
-            background_color="#0f172a",
-            show_axes=True,
-            compute_extra_data=True,
-            multi_traj=False,
-            trajectory_slider=True if crystals else False,
-            unwrap_molecules=True,
-            fog=True,
-            fog_strength=0.5,
-            draw_outlines=True,
-            measuring_tool=True,
-            recording_tools=True,
-            record_include_bgd=True,
-            record_include_ui=True,
-            viewer_outline="1px solid #334155",
-            height="450px",
-        )
+    # 4. Define custom callable to extract space group and asymmetric unit count
+    def extract_crystal_metadata(c: Crystal) -> dict:
+        return {
+            "space group": f"{c.space_group.international_tables_number} ({c.space_group.symbol})",
+            "Z' (asym molecules)": len(c.asym_mols()),
+        }
 
-        status_msg = f"Generated **{len(crystals)}** crystal candidate(s) across space groups: **{valid_space_groups}** with $Z'={z_prime}$."
-        if invalid_tokens:
-            status_msg += f" *(Ignored out-of-range space groups: {invalid_tokens})*"
-    return (viewer,)
+    # 5. Visualize the generated structures
+    viewer = view_cspy(
+        crystals if crystals else mol,
+        extra_data=extract_crystal_metadata if crystals else None,
+        clip_distance=clip_distance_slider.value,
+        style=style_dropdown.value,
+        background_color="#0f172a",
+        show_axes=True,
+        compute_extra_data=True,
+        multi_traj=False,
+        trajectory_slider=True if crystals else False,
+        fog=True,
+        fog_strength=0.5,
+        draw_outlines=True,
+        measuring_tool=True,
+        recording_tools=True,
+        record_include_bgd=True,
+        record_include_ui=True,
+        viewer_outline="1px solid #334155",
+        height="450px",
+        unwrap_molecules=False
+    )
 
-
-@app.cell
-def _(viewer):
-    viewer
+    status_msg = f"Generated **{len(crystals)}** crystal candidate(s) across space groups: **{valid_space_groups}** with $Z'={z_prime}$."
+    if invalid_tokens:
+        status_msg += f" *(Ignored out-of-range space groups: {invalid_tokens})*"
+    mo.vstack([mo.md(status_msg), viewer])
     return
 
 

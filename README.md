@@ -164,6 +164,7 @@ All viewer functions (`view_structure`, `view_ase`, `view_pymatgen`, `view_cspy`
 | `viewer_outline` | `bool` \| `str` | `False` | Draw border around the viewport. `True` for subtle border or CSS border string. |
 | `fog` | `bool` | `False` | Distance fog effect for depth cueing in large lattices. |
 | `fog_strength` | `float` | `0.5` | Strength of the fog effect ($0.0$ to $1.0$). |
+| `clip_distance` | `float` | `0.0` | Near camera clipping plane distance in Å. If `0.0` (default), near clipping is disabled. If positive, clips atoms closer to the camera than this distance. *(added in v0.3.0)* |
 | `draw_outlines` | `bool` | `False` | Stylized cartoon / cel-shaded silhouette outlines around atoms and bonds. |
 | `draw_labels` | `bool` | `False` | Element and index labels on atoms with 3D occlusion testing. |
 | `measuring_tool` | `bool` | `False` | Enable ruler button in the top-right toolbar for distance and angle measurements. |

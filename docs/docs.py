@@ -141,6 +141,7 @@ def _():
     | `viewer_outline` | `bool` \| `str` | `False` | Draws a border around the viewer container. Set `True` for a subtle grey outline or pass a CSS border string (e.g. `"1px solid #ccc"`). |
     | `fog` | `bool` | `False` | Enables distance fog effect for depth cueing in large lattices. |
     | `fog_strength` | `float` | `0.5` | Strength of the fog effect (0.0 to 1.0). |
+    | `clip_distance` | `float` | `0.0` | Near camera clipping plane distance in Å. If `0.0` (default), near clipping is disabled. If positive, clips atoms closer to the camera than this distance. *(added in v0.3.0)* |
     | `draw_outlines` | `bool` | `False` | Draws stylized cartoon / cel-shaded silhouette outlines around atoms and bonds. |
     | `draw_labels` | `bool` | `False` | Displays element/index labels on top of atoms with 3D occlusion testing. |
     | `measuring_tool` | `bool` | `False` | Enables the ruler button in the top-right overlay for distance, angle, and dihedral measurements. |

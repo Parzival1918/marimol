@@ -69,9 +69,36 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             dirLight2.position.set(-10, -10, -10);
             scene.add(dirLight2);
 
-            const persCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-            const orthoCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 1000);
+            const persCamera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.001, 50000);
+            const orthoCamera = new THREE.OrthographicCamera(-10, 10, 10, -10, -50000, 50000);
             let camera = model.get('projection') === 'orthographic' ? orthoCamera : persCamera;
+
+            let currentMaxDist = 1000;
+            const applyCameraClipping = (maxD) => {
+                if (typeof maxD === 'number' && maxD > 0) {
+                    currentMaxDist = maxD;
+                }
+                const cd = model.get('clip_distance');
+                const farPlane = Math.max(50000, currentMaxDist * 10);
+
+                if (typeof cd === 'number' && cd > 0) {
+                    // Positive clip distance explicitly requested
+                    orthoCamera.near = cd;
+                    orthoCamera.far = farPlane;
+                    persCamera.near = cd;
+                    persCamera.far = farPlane;
+                } else {
+                    // Disabled clipping (clip_distance <= 0 or not set)
+                    // Orthographic camera uses negative near plane to disable near clipping entirely
+                    orthoCamera.near = -farPlane;
+                    orthoCamera.far = farPlane;
+                    persCamera.near = 0.001;
+                    persCamera.far = farPlane;
+                }
+                orthoCamera.updateProjectionMatrix();
+                persCamera.updateProjectionMatrix();
+            };
+            applyCameraClipping();
 
             const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
             renderer.setSize(container.clientWidth, container.clientHeight);
@@ -1993,9 +2020,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
                     let maxDist = 0;
                     if (cellCenter) {
-                        // Base maxDist on the distance from cell center to the origin (half the main diagonal)
-                        maxDist = cellCenter.length();
-                    } else if (numAtoms > 0) {
+                        maxDist = Math.max(maxDist, cellCenter.length());
+                    }
+                    if (numAtoms > 0) {
                         for (let i = 0; i < numAtoms; i++) {
                             const pos = new THREE.Vector3().fromArray(positions[i] || [0,0,0]);
                             const dist = pos.distanceTo(sceneCenter);
@@ -2008,12 +2035,13 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     if (camera.isOrthographicCamera) {
                         const aspect = container.clientWidth / container.clientHeight;
                         // Provide a 1.5x margin so the molecule fits comfortably
-                        camera.left = -maxDist * aspect * 1.5;
-                        camera.right = maxDist * aspect * 1.5;
-                        camera.top = maxDist * 1.5;
-                        camera.bottom = -maxDist * 1.5;
-                        camera.updateProjectionMatrix();
+                        orthoCamera.left = -maxDist * aspect * 1.5;
+                        orthoCamera.right = maxDist * aspect * 1.5;
+                        orthoCamera.top = maxDist * 1.5;
+                        orthoCamera.bottom = -maxDist * 1.5;
                     }
+
+                    applyCameraClipping(maxDist);
 
                     camera.position.set(sceneCenter.x, sceneCenter.y, sceneCenter.z + cameraDist);
 
@@ -2055,6 +2083,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             model.on("change:viewer_outline", applyOutline);
             model.on("change:fog", () => updateScene(true));
             model.on("change:fog_strength", () => updateScene(true));
+            model.on("change:clip_distance", () => {
+                applyCameraClipping();
+                renderer.render(scene, camera);
+            });
             model.on("change:draw_outlines", () => updateScene(true));
             model.on("change:draw_labels", () => updateScene(true));
             model.on("change:show_axes", () => {
@@ -2488,6 +2520,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     dpi = traitlets.Int(200).tag(sync=True)
     record_include_bgd = traitlets.Bool(False).tag(sync=True)
     record_include_ui = traitlets.Bool(False).tag(sync=True)
+    clip_distance = traitlets.Float(0.0, allow_none=True).tag(sync=True)
 
 
 STYLES = {
@@ -2527,6 +2560,7 @@ DEFAULT_VIEWER_CONFIG = {
     "viewer_outline": False,
     "fog": False,
     "fog_strength": 0.5,
+    "clip_distance": 0.0,
     "draw_outlines": False,
     "draw_labels": False,
     "measuring_tool": False,
@@ -2558,6 +2592,7 @@ def view_structure(
     viewer_outline: bool | str = _UNSET,
     fog: bool = _UNSET,
     fog_strength: float = _UNSET,
+    clip_distance: float = _UNSET,
     draw_outlines: bool = _UNSET,
     draw_labels: bool = _UNSET,
     measuring_tool: bool = _UNSET,
@@ -2606,6 +2641,11 @@ def view_structure(
         Whether to apply fog effect. Default is False.
     fog_strength : float, optional
         Strength of the fog effect. Default is 0.5.
+    clip_distance : float, optional
+        Near clipping plane distance in Angstroms. Atoms closer to the camera than this distance
+        will not be drawn. If set to 0.0 (default), near clipping is disabled so all structures
+        are drawn without clipping regardless of cell size. When set to a positive value, enables
+        near-camera clipping / cross-sectioning. *(added in v0.3.0)*
     draw_outlines : bool, optional
         Whether to draw outlines around atoms and bonds. Default is False.
     draw_labels : bool, optional
@@ -2664,6 +2704,7 @@ def view_structure(
     viewer_outline = _resolve(viewer_outline, "viewer_outline")
     fog = _resolve(fog, "fog")
     fog_strength = _resolve(fog_strength, "fog_strength")
+    clip_distance = _resolve(clip_distance, "clip_distance")
     draw_outlines = _resolve(draw_outlines, "draw_outlines")
     draw_labels = _resolve(draw_labels, "draw_labels")
     measuring_tool = _resolve(measuring_tool, "measuring_tool")
@@ -2725,6 +2766,7 @@ def view_structure(
         viewer_outline=viewer_outline,
         fog=fog,
         fog_strength=fog_strength,
+        clip_distance=clip_distance,
         draw_outlines=draw_outlines,
         draw_labels=draw_labels,
         measuring_tool=measuring_tool,
