@@ -258,14 +258,18 @@ uv run just docs-edit
 
 Contributions to **marimol** are very welcome! Whether you are reporting issues, adding support for new computational chemistry packages, improving WebGL performance, or enhancing documentation, here is how to get started:
 
+> [!IMPORTANT]
+> **Branching Model**: Active development takes place on the **`dev`** branch. All new feature branches and pull requests should be based on and opened against **`dev`**. The **`main`** branch is reserved for stable releases; changes in `dev` will be merged into `main` when a new release candidate is ready.
+
 ### 1. Fork and clone the repository
 
 1. Fork the [marimol repository](https://github.com/Parzival1918/marimol) to your own GitHub account by clicking the **Fork** button on GitHub.
-2. Clone your personal fork locally:
+2. Clone your personal fork locally and switch to the `dev` branch:
 
 ```bash
 git clone https://github.com/<your-username>/marimol.git
 cd marimol
+git checkout dev
 ```
 
 ### 2. Set up the development environment & pre-commit hooks
@@ -328,10 +332,28 @@ uv run just docs-build
 
 ### 6. Submitting a Pull Request
 
-1. Create a feature branch on your fork: `git checkout -b feature/my-new-feature`
-2. Make your changes and commit them: `git commit -m "feat: add support for XYZ"`
-3. Push to your fork: `git push origin feature/my-new-feature`
-4. Open a Pull Request from your branch to the `main` branch of [Parzival1918/marimol](https://github.com/Parzival1918/marimol).
+1. Make sure your local `dev` branch is up to date:
+   ```bash
+   git checkout dev
+   git pull origin dev
+   ```
+2. Create a feature branch branching off `dev`:
+   ```bash
+   git checkout -b feature/my-new-feature
+   ```
+3. Make your changes and commit them:
+   ```bash
+   git commit -m "feat: add support for XYZ"
+   ```
+4. Run checks to verify code formatting and tests:
+   ```bash
+   uv run just check
+   ```
+5. Push to your fork:
+   ```bash
+   git push origin feature/my-new-feature
+   ```
+6. Open a Pull Request from your feature branch to the **`dev`** branch of [Parzival1918/marimol](https://github.com/Parzival1918/marimol).
 
 ---
 
