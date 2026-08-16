@@ -384,9 +384,48 @@ def unwrap_molecules(data: dict) -> dict:
     return new_data
 
 
+def _compute_periodic_extra_data(cell_arr: np.ndarray, num_atoms: int, total_atomic_weight: float) -> dict:
+    a_len = float(np.linalg.norm(cell_arr[0]))
+    b_len = float(np.linalg.norm(cell_arr[1]))
+    c_len = float(np.linalg.norm(cell_arr[2]))
+    alpha = np.arccos(np.dot(cell_arr[1], cell_arr[2]) / (b_len * c_len)) * 180 / np.pi
+    beta = np.arccos(np.dot(cell_arr[0], cell_arr[2]) / (a_len * c_len)) * 180 / np.pi
+    gamma = np.arccos(np.dot(cell_arr[0], cell_arr[1]) / (a_len * b_len)) * 180 / np.pi
+    volume = float(abs(np.linalg.det(cell_arr)))
+    # Density in g/cm³: (mass_g_per_mol) / (volume_A3 * N_A * 1e-24)
+    # N_A * 1e-24 = 0.602214076
+    density = float(total_atomic_weight / (volume * 0.602214076)) if volume > 0 else 0.0
+
+    return {
+        "density": density,
+        "volume": volume,
+        "nº atoms": int(num_atoms),
+        "a": a_len,
+        "b": b_len,
+        "c": c_len,
+        "alpha": alpha,
+        "beta": beta,
+        "gamma": gamma,
+    }
+
+
+def _get_valid_unit_cell(unit_cell) -> np.ndarray | None:
+    if not unit_cell:
+        return None
+    try:
+        cell_arr = np.array(unit_cell, dtype=float)
+        if cell_arr.shape == (3, 3) and abs(np.linalg.det(cell_arr)) > 1e-6:
+            return cell_arr
+    except (ValueError, TypeError, np.linalg.LinAlgError):
+        pass
+    return None
+
+
 def compute_extra_data(data: dict) -> dict:
     """
     Compute extra data for a structure and add it to its 'extra_data' dictionary.
+    If the user has defined values in 'extra_data' that clash with those computed,
+    the user-provided value is kept.
 
     For non-periodic structures:
         - number_of_atoms: total number of atoms
@@ -421,47 +460,21 @@ def compute_extra_data(data: dict) -> dict:
 
     species = data.get("species", [])
     positions = data.get("positions", [])
-    unit_cell = data.get("unit_cell")
-
     num_atoms = len(positions) if positions else len(species)
     total_atomic_weight = float(sum(ATOMIC_WEIGHTS.get(str(s).strip().capitalize(), 0.0) for s in species))
 
-    is_periodic = False
-    cell_arr = None
-    if unit_cell:
-        try:
-            cell_arr = np.array(unit_cell, dtype=float)
-            if cell_arr.shape == (3, 3):
-                vol = float(abs(np.linalg.det(cell_arr)))
-                if vol > 1e-6:
-                    is_periodic = True
-        except (ValueError, TypeError, np.linalg.LinAlgError):
-            is_periodic = False
-
-    if is_periodic and cell_arr is not None:
-        a_len = float(np.linalg.norm(cell_arr[0]))
-        b_len = float(np.linalg.norm(cell_arr[1]))
-        c_len = float(np.linalg.norm(cell_arr[2]))
-        alpha = np.arccos(np.dot(cell_arr[1], cell_arr[2]) / (b_len * c_len)) * 180 / np.pi
-        beta = np.arccos(np.dot(cell_arr[0], cell_arr[2]) / (a_len * c_len)) * 180 / np.pi
-        gamma = np.arccos(np.dot(cell_arr[0], cell_arr[1]) / (a_len * b_len)) * 180 / np.pi
-        volume = float(abs(np.linalg.det(cell_arr)))
-        # Density in g/cm³: (mass_g_per_mol) / (volume_A3 * N_A * 1e-24)
-        # N_A * 1e-24 = 0.602214076
-        density = float(total_atomic_weight / (volume * 0.602214076)) if volume > 0 else 0.0
-
-        data["extra_data"]["density"] = density
-        data["extra_data"]["volume"] = volume
-        data["extra_data"]["nº atoms"] = int(num_atoms)
-        data["extra_data"]["a"] = a_len
-        data["extra_data"]["b"] = b_len
-        data["extra_data"]["c"] = c_len
-        data["extra_data"]["alpha"] = alpha
-        data["extra_data"]["beta"] = beta
-        data["extra_data"]["gamma"] = gamma
+    cell_arr = _get_valid_unit_cell(data.get("unit_cell"))
+    if cell_arr is not None:
+        defaults = _compute_periodic_extra_data(cell_arr, num_atoms, total_atomic_weight)
     else:
-        data["extra_data"]["nº atoms"] = int(num_atoms)
-        data["extra_data"]["atomic weight"] = total_atomic_weight
+        defaults = {
+            "nº atoms": int(num_atoms),
+            "atomic weight": total_atomic_weight,
+        }
+
+    for k, v in defaults.items():
+        if k not in data["extra_data"]:
+            data["extra_data"][k] = v
 
     return data["extra_data"]
 

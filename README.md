@@ -175,6 +175,7 @@ All viewer functions (`view_structure`, `view_ase`, `view_pymatgen`, `view_cspy`
 | `traj_fps` | `float` | `10.0` | Playback speed in frames per second for trajectory animations. |
 | `trajectory_slider` | `bool` | `False` | Scrubbable timeline slider in the trajectory control bar. |
 | `compute_extra_data` | `bool` | `False` | Automatically compute density, volume, lattice lengths & angles, atom count, and MW for the metadata drawer. |
+| `extra_data` | `Callable[[T], dict]` | `None` | Custom callable accepting the structure/object and returning a dictionary of metadata for the extra data drawer (only available in `view_ase`, `view_pymatgen`, `view_cspy`). *(added in v0.3.0)* |
 | `show_help` | `bool` | `True` | Show the help button and enable the <kbd>H</kbd> interactive controls overlay. *(added in v0.2.0)* |
 | `recording_tools` | `bool` | `False` | Show screenshot (PNG) and video recording (WebM/MP4) buttons in the viewer toolbar. *(added in v0.2.0)* |
 | `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. *(added in v0.2.0)* |
@@ -241,6 +242,7 @@ uv run marimo edit examples/01_interactive_molecule_viewer.py
 | [`02_trajectory_and_animation.py`](examples/02_trajectory_and_animation.py) | Multi-frame vibrational trajectory with media controls, scrubbable timeline, and video recording. |
 | [`03_crystal_structures_and_extra_data.py`](examples/03_crystal_structures_and_extra_data.py) | Periodic crystal lattices with unit cell wireframes, depth fog, and automated crystallographic metrics. |
 | [`04_toml_presets_and_themes.py`](examples/04_toml_presets_and_themes.py) | Reusable visual presets loaded from TOML via `config` with parameter overrides. *(added in v0.2.0)* |
+| [`05_cspy_crystal_generation_and_custom_extra_data.py`](examples/05_cspy_crystal_generation_and_custom_extra_data.py) | Crystal structure generation across space groups with custom `extra_data` callable. *(added in v0.3.0)* |
 
 ---
 

@@ -152,6 +152,7 @@ def _():
     | `traj_fps` | `float` | `10.0` | Playback speed in frames per second for trajectory animations. |
     | `trajectory_slider` | `bool` | `False` | Displays a scrubbable timeline slider in the trajectory control bar. |
     | `compute_extra_data` | `bool` | `False` | Automatically computes physical/crystallographic properties (density, volume, lattice lengths & angles, atom count, molecular weight) for the info drawer. |
+    | `extra_data` | `Callable[[T], dict]` | `None` | Custom callable accepting the structure/object and returning a dictionary of metadata for the extra data drawer (only available in `view_ase`, `view_pymatgen`, `view_cspy`). *(added in v0.3.0)* |
     | `show_help` | `bool` | `True` | Whether to show the help button and enable the 'h' interaction help overlay. *(added in v0.2.0)* |
     | `recording_tools` | `bool` | `False` | Whether to show screenshot (PNG) and animation video recording (WebM/MP4) buttons in the viewer toolbar. *(added in v0.2.0)* |
     | `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. *(added in v0.2.0)* |
@@ -501,9 +502,9 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### 5. mol-cspy Integration: Crystal Structure Generation with `CrystalGenerator`
+    ### 5. mol-cspy Integration: Crystal Generation & Custom Metadata
 
-    Visualizing predicted molecular crystal candidates generated with **mol-cspy**'s `CrystalGenerator` (`cspy.crystal.generate_crystal.CrystalGenerator`). Multiple candidate crystal structures are loaded as a collection with interactive trajectory navigation (`multi_traj=False`, `trajectory_slider=True`), and automated crystallographic data computation (`compute_extra_data=True`). Screen captures and recordings can be taken (`recording_tools=True`), and the background and UI elements are also included in the saved files (`record_include_bgd=True` and `record_include_ui=True`).
+    Visualizing predicted molecular crystal candidates generated with **mol-cspy**'s `CrystalGenerator` (`cspy.crystal.generate_crystal.CrystalGenerator`) across space groups 2 ($P\bar{1}$) and 14 ($P2_1/c$). Multiple candidate crystal structures are loaded with interactive trajectory navigation (`multi_traj=False`, `trajectory_slider=True`), automated physical property computation (`compute_extra_data=True`), and a custom **`extra_data` callable** *(feature added in v0.3.0)* that adds space group metadata and asymmetric unit molecule count ($Z'$) directly to the information drawer.
     """)
     return
 
@@ -528,19 +529,32 @@ def _():
     ''')
     mol.guess_bonds()
 
-    # 2. Generate candidate crystal polymorphs in space group P-1 (space group 2)
-    generator = CrystalGenerator([mol, mol], space_group=2)
+    # 2. Generate candidate crystal polymorphs in space groups 2 (P-1) and 14 (P2_1/c)
+    space_groups = [2, 14]
+    z_prime = 1  # Number of molecules in asymmetric unit
     crystals = []
-    for seed in range(1, 30):
-        candidate = generator.generate(seed)
-        if candidate is not None:
-            crystals.append(candidate)
-        if len(crystals) == 10:
-            break
+    for sg in space_groups:
+        generator = CrystalGenerator([mol] * z_prime, space_group=sg)
+        count = 0
+        for seed in range(1, 40):
+            candidate = generator.generate(seed)
+            if candidate is not None:
+                crystals.append(candidate)
+                count += 1
+                if count >= 3:
+                    break
 
-    # 3. Visualize the generated candidate crystals with frame slider & computed extra data
+    # 3. Define custom extra_data callable to attach space group to metadata drawer
+    def extract_crystal_extra_data(c):
+        return {
+            "space group": f"{c.space_group.international_tables_number} ({c.space_group.symbol})",
+            "Z' (asym molecules)": len(c.asym_mols()),
+        }
+
+    # 4. Visualize the candidate crystals with frame slider & custom extra data
     view_cspy(
         crystals,
+        extra_data=extract_crystal_extra_data,
         multi_traj=False,
         trajectory_slider=True,
         compute_extra_data=True,
@@ -566,20 +580,31 @@ def _():
     """)
     _mol.guess_bonds()
 
-    _generator = CrystalGenerator([_mol, _mol], space_group=2)
     _crystals = []
-    for _seed in range(1, 30):
-        _candidate = _generator.generate(_seed)
-        if _candidate is not None:
-            _crystals.append(_candidate)
-        if len(_crystals) == 10:
-            break
+    for _sg in [2, 14]:
+        _generator = CrystalGenerator([_mol], space_group=_sg)
+        _count = 0
+        for _seed in range(1, 40):
+            _candidate = _generator.generate(_seed)
+            if _candidate is not None:
+                _crystals.append(_candidate)
+                _count += 1
+                if _count >= 3:
+                    break
+
+    def _extract_crystal_extra_data(_c):
+        return {
+            "space group": f"{_c.space_group.international_tables_number} ({_c.space_group.symbol})",
+            "Z' (asym molecules)": len(_c.asym_mols()),
+        }
 
     _viewer = view_cspy(
         _crystals,
+        extra_data=_extract_crystal_extra_data,
         multi_traj=False,
         trajectory_slider=True,
         compute_extra_data=True,
+        unwrap_molecules=True,
         show_axes=True,
         viewer_outline=True,
         fog=True,
@@ -595,9 +620,9 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### 6. Config-Driven Visualization: Loading Settings from TOML & Dict *(added in v0.2.0)*
+    ### 6. Config-Driven Visualization: Loading Settings from TOML & Dict
 
-    You can define reusable viewer styles and presets using Python dictionaries, TOML formatted strings, or `.toml` configuration files, and supply them via the `config` argument. Any explicitly passed arguments to the viewer will overwrite the settings specified in the configuration.
+    You can define reusable viewer styles and presets using Python dictionaries, TOML formatted strings, or `.toml` configuration files, and supply them via the `config` argument *(feature added in v0.2.0)*. Any explicitly passed arguments to the viewer will overwrite the settings specified in the configuration.
 
     The example below visualizes an ethanol ($\text{C}_2\text{H}_5\text{OH}$) molecule configured through a TOML string with custom background color, coordinate axes, auto-spin, and measurement & recording tools.
     """)
