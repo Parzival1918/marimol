@@ -252,35 +252,35 @@ def compute_bonds(data: dict, use_pbc: bool = False) -> list[dict]:
         ]
     )
 
-    bonds = []
-    has_pbc = False
+    shifts = np.zeros((1, 3))
     if use_pbc and unit_cell:
         try:
-            unit_cell_arr = np.array(unit_cell, dtype=float)
-            inv_cell = np.linalg.inv(unit_cell_arr)
-            frac_pos = pos_arr @ inv_cell
-            has_pbc = True
-        except (ValueError, np.linalg.LinAlgError):
+            uc = np.array(unit_cell, dtype=float)
+            if uc.shape == (3, 3) and abs(np.linalg.det(uc)) > 1e-6:
+                shifts = np.array(
+                    [
+                        nx * uc[0] + ny * uc[1] + nz * uc[2]
+                        for nx in (-1, 0, 1)
+                        for ny in (-1, 0, 1)
+                        for nz in (-1, 0, 1)
+                    ]
+                )
+        except (ValueError, TypeError):
             pass
 
+    bonds = []
     for i in range(num_atoms):
         rA = radii[i]
         j_indices = np.arange(i + 1, num_atoms)
         if len(j_indices) == 0:
             break
 
-        if has_pbc:
-            df = frac_pos[i] - frac_pos[j_indices]
-            df -= np.round(df)
-            dc = df @ unit_cell_arr
-        else:
-            dc = pos_arr[i] - pos_arr[j_indices]
-
-        dist = np.linalg.norm(dc, axis=1)
+        diffs = (pos_arr[j_indices, None, :] + shifts[None, :, :]) - pos_arr[i]
+        dists_sq = np.sum(diffs**2, axis=2)
+        min_dists = np.sqrt(np.min(dists_sq, axis=1))
 
         thresholds = (rA + radii[j_indices]) * 1.3
-
-        connected = np.where((dist > 0.1) & (dist < thresholds))[0]
+        connected = np.where((min_dists > 0.1) & (min_dists < thresholds))[0]
         for idx in connected:
             j = int(j_indices[idx])
             bonds.append({"source": i, "target": j})
@@ -310,9 +310,18 @@ def _center_molecules(
 
 
 def _unwrap_components(
-    num_atoms: int, adj: dict, positions: np.ndarray, inv_cell: np.ndarray, unit_cell: np.ndarray
+    num_atoms: int, adj: dict[int, list[int]], positions: np.ndarray, unit_cell: np.ndarray
 ) -> list[list[int]]:
     """Perform BFS to find connected components and unwrap them."""
+    shifts = np.array(
+        [
+            nx * unit_cell[0] + ny * unit_cell[1] + nz * unit_cell[2]
+            for nx in (-1, 0, 1)
+            for ny in (-1, 0, 1)
+            for nz in (-1, 0, 1)
+        ]
+    )
+
     visited = np.zeros(num_atoms, dtype=bool)
     molecules = []
 
@@ -328,10 +337,10 @@ def _unwrap_components(
                     if not visited[neighbor]:
                         visited[neighbor] = True
 
-                        # Unwrap neighbor relative to curr
-                        df = (positions[neighbor] - positions[curr]) @ inv_cell
-                        df -= np.round(df)
-                        positions[neighbor] = positions[curr] + df @ unit_cell
+                        cands = positions[neighbor] + shifts
+                        dists_sq = np.sum((cands - positions[curr]) ** 2, axis=1)
+                        best_idx = int(np.argmin(dists_sq))
+                        positions[neighbor] = cands[best_idx]
 
                         queue.append(neighbor)
             molecules.append(comp)
@@ -365,7 +374,7 @@ def unwrap_molecules(data: dict) -> dict:
     if not bonds:
         bonds = compute_bonds(data, use_pbc=True)
 
-    adj = {i: [] for i in range(num_atoms)}
+    adj: dict[int, list[int]] = {i: [] for i in range(num_atoms)}
     for bond in bonds:
         u, v = bond["source"], bond["target"]
         adj[u].append(v)
@@ -375,7 +384,7 @@ def unwrap_molecules(data: dict) -> dict:
     new_data = copy.deepcopy(data)
     new_positions = np.array(new_data["positions"], dtype=float)
 
-    molecules = _unwrap_components(num_atoms, adj, new_positions, inv_cell, unit_cell)
+    molecules = _unwrap_components(num_atoms, adj, new_positions, unit_cell)
 
     # 3. Center each molecule
     _center_molecules(new_positions, molecules, inv_cell, unit_cell)
