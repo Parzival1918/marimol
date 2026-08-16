@@ -114,10 +114,10 @@ def _():
       - Click the ruler button again or click empty canvas space to exit measurement mode.
     - **Extra Data Drawer**:
       - Click the **List icon** in the top-right overlay to expand the metadata drawer, showing properties such as unit cell volume, density, lattice parameters ($a, b, c, \alpha, \beta, \gamma$), atom counts, or custom calculation results.
-    - **Capture & Recording Tools**:
+    - **Capture & Recording Tools** *(added in v0.2.0)*:
       - Click the **Camera icon** (or press <kbd>S</kbd>) to save a high-resolution PNG screenshot directly to your downloads.
       - Click the **Video icon** (or press <kbd>R</kbd>) to record WebM/MP4 animations of trajectory playback or auto-spin, or to record your manual interactions with the structure.
-    - **Help & Controls Overlay**:
+    - **Help & Controls Overlay** *(added in v0.2.0)*:
       - Press the <kbd>H</kbd> key while hovering over the viewer or click the **Question Mark icon** in the top-right overlay to display an interactive summary of all navigation, selection, measuring, recording, trajectory, and axis controls.
     - **Trajectory Controls**:
       - When visualizing a list of frames, a media player overlay appears with buttons for First, Previous, Play/Pause, Next, and Last frame, as well as an optional scrubbable frame slider.
@@ -131,7 +131,7 @@ def _():
     | Parameter | Type | Default | Description |
     | :--- | :--- | :--- | :--- |
     | `data` / `atoms` / `structure` | `dict` \| `list[dict]` | *Required* | Structure dictionary or list of dictionaries (or `ase.Atoms`, `pymatgen.core.Structure`, `cspy.Crystal` / `cspy.Molecule`). |
-    | `config` | `dict` \| `str` \| `PathLike` | `None` | Reusable configuration dictionary, TOML string, or path to a TOML file. Explicit keyword arguments will override config values. |
+    | `config` | `dict` \| `str` \| `PathLike` | `None` | Reusable configuration dictionary, TOML string, or path to a TOML file. Explicit keyword arguments will override config values. *(added in v0.2.0)* |
     | `style` | `str` \| `dict` | `"ball-and-stick"` | Visual representation style: `"ball-and-stick"`, `"vdw"`, `"wireframe"`, or a custom style dictionary. |
     | `background_color` | `str` | `"white"` | Viewport background color (e.g. `"white"`, `"black"`, `"transparent"`, `"#1e1e1e"`). |
     | `show_axes` | `bool` | `False` | Whether to display the interactive XYZ coordinate triad in the bottom-left corner. |
@@ -152,11 +152,11 @@ def _():
     | `traj_fps` | `float` | `10.0` | Playback speed in frames per second for trajectory animations. |
     | `trajectory_slider` | `bool` | `False` | Displays a scrubbable timeline slider in the trajectory control bar. |
     | `compute_extra_data` | `bool` | `False` | Automatically computes physical/crystallographic properties (density, volume, lattice lengths & angles, atom count, molecular weight) for the info drawer. |
-    | `show_help` | `bool` | `True` | Whether to show the help button and enable the 'h' interaction help overlay. |
-    | `recording_tools` | `bool` | `False` | Whether to show screenshot (PNG) and animation video recording (WebM/MP4) buttons in the viewer toolbar. |
-    | `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. |
-    | `record_include_bgd` | `bool` | `False` | Whether to include the viewer's background color in exported screenshots and video recordings (default is `False` for transparent backgrounds). |
-    | `record_include_ui` | `bool` | `False` | Whether to include all viewer UI elements (playback controls, info panels, measurements, labels) in exported screenshots and video recordings. |
+    | `show_help` | `bool` | `True` | Whether to show the help button and enable the 'h' interaction help overlay. *(added in v0.2.0)* |
+    | `recording_tools` | `bool` | `False` | Whether to show screenshot (PNG) and animation video recording (WebM/MP4) buttons in the viewer toolbar. *(added in v0.2.0)* |
+    | `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. *(added in v0.2.0)* |
+    | `record_include_bgd` | `bool` | `False` | Whether to include the viewer's background color in exported screenshots and video recordings (default is `False` for transparent backgrounds). *(added in v0.2.0)* |
+    | `record_include_ui` | `bool` | `False` | Whether to include all viewer UI elements (playback controls, info panels, measurements, labels) in exported screenshots and video recordings. *(added in v0.2.0)* |
 
     ### Custom Style Dictionaries
 
@@ -595,7 +595,7 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### 6. Config-Driven Visualization: Loading Settings from TOML & Dict
+    ### 6. Config-Driven Visualization: Loading Settings from TOML & Dict *(added in v0.2.0)*
 
     You can define reusable viewer styles and presets using Python dictionaries, TOML formatted strings, or `.toml` configuration files, and supply them via the `config` argument. Any explicitly passed arguments to the viewer will overwrite the settings specified in the configuration.
 

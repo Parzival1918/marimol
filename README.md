@@ -28,8 +28,8 @@ For a more in depth documentation which includes interactive examples see: [mari
 - 🧊 **Crystallography & Periodic Boundaries**: Unit cell bounding boxes, crystallographic lattice vector indicators ($a, b, c$), and automatic molecule unwrapping across periodic boundary conditions (`unwrap_molecules=True`).
 - 🎨 **Visual Styles & Cel Shading**: Ball-and-stick, Van der Waals (VDW), wireframe, stylized cartoon silhouette outlines (`draw_outlines=True`), atom element/index labels (`draw_labels=True`), depth fog, and custom styles.
 - 📊 **Metadata Drawer**: Instant inspection of unit cell parameters ($a, b, c, \alpha, \beta, \gamma$), volume, density, and custom calculation results.
-- 📸 **Image Capture & Video Recording**: High-resolution PNG screenshots (<kbd>S</kbd>) and WebM/MP4 animation recordings (<kbd>R</kbd>) of trajectories or auto-spin loops directly to your downloads.
-- ❓ **Interactive Help & Controls Overlay**: Built-in cheatsheet of all keyboard and mouse interactions (toggle with <kbd>H</kbd> or the <kbd>?</kbd> button).
+- 📸 **Image Capture & Video Recording** *(added in v0.2.0)*: High-resolution PNG screenshots (<kbd>S</kbd>) and WebM/MP4 animation recordings (<kbd>R</kbd>) of trajectories or auto-spin loops directly to your downloads.
+- ❓ **Interactive Help & Controls Overlay** *(added in v0.2.0)*: Built-in cheatsheet of all keyboard and mouse interactions (toggle with <kbd>H</kbd> or the <kbd>?</kbd> button).
 
 ---
 
@@ -140,10 +140,10 @@ f"Currently viewing trajectory frame: {current_step}"
 | **Snap View to Axis** | Click **X**, **Y**, or **Z** on the bottom-left coordinate triad |
 | **Measurement Tool** | Click the **Ruler icon** (top-right), then pick 2 (dist), 3 (angle), or 4 (dihedral) atoms |
 | **Extra Data Drawer** | Click the **List icon** (top-right) to expand the metadata drawer |
-| **Capture Screenshot** | Click the **Camera icon** or press <kbd>S</kbd> (when `recording_tools=True`) |
-| **Record Animation** | Click the **Video icon** or press <kbd>R</kbd> (when `recording_tools=True`) |
-| **Help & Shortcuts** | Press <kbd>H</kbd> or click the <kbd>?</kbd> icon to open the controls overlay |
-| **Close Help** | Press <kbd>Esc</kbd> or click outside the modal |
+| **Capture Screenshot** | Click the **Camera icon** or press <kbd>S</kbd> (when `recording_tools=True`) *(added in v0.2.0)* |
+| **Record Animation** | Click the **Video icon** or press <kbd>R</kbd> (when `recording_tools=True`) *(added in v0.2.0)* |
+| **Help & Shortcuts** | Press <kbd>H</kbd> or click the <kbd>?</kbd> icon to open the controls overlay *(added in v0.2.0)* |
+| **Close Help** | Press <kbd>Esc</kbd> or click outside the modal *(added in v0.2.0)* |
 
 ---
 
@@ -154,7 +154,7 @@ All viewer functions (`view_structure`, `view_ase`, `view_pymatgen`, `view_cspy`
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `data` / `atoms` / `structure` | `dict` \| `list[dict]` | *Required* | Structure dictionary, list of dictionaries, or external library structure object. |
-| `config` | `dict` \| `str` \| `PathLike` | `None` | Configuration dictionary, TOML string, or path to a `.toml` file. Explicit arguments will overwrite config settings. |
+| `config` | `dict` \| `str` \| `PathLike` | `None` | Configuration dictionary, TOML string, or path to a `.toml` file. Explicit arguments will overwrite config settings. *(added in v0.2.0)* |
 | `style` | `str` \| `dict` | `"ball-and-stick"` | Representation style: `"ball-and-stick"`, `"vdw"`, `"wireframe"`, or custom `dict`. |
 | `background_color` | `str` | `"white"` | Viewport background color (e.g. `"white"`, `"black"`, `"#1e1e1e"`, `"transparent"`). |
 | `show_axes` | `bool` | `False` | Display interactive XYZ coordinate triad in the bottom-left corner. |
@@ -175,15 +175,15 @@ All viewer functions (`view_structure`, `view_ase`, `view_pymatgen`, `view_cspy`
 | `traj_fps` | `float` | `10.0` | Playback speed in frames per second for trajectory animations. |
 | `trajectory_slider` | `bool` | `False` | Scrubbable timeline slider in the trajectory control bar. |
 | `compute_extra_data` | `bool` | `False` | Automatically compute density, volume, lattice lengths & angles, atom count, and MW for the metadata drawer. |
-| `show_help` | `bool` | `True` | Show the help button and enable the <kbd>H</kbd> interactive controls overlay. |
-| `recording_tools` | `bool` | `False` | Show screenshot (PNG) and video recording (WebM/MP4) buttons in the viewer toolbar. |
-| `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. |
-| `record_include_bgd` | `bool` | `False` | Include the background color in exported screenshots and video recordings (default is `False` for transparent backgrounds). |
-| `record_include_ui` | `bool` | `False` | Include all viewer UI elements (playback controls, info panel, measurements, labels) in exported screenshots and video recordings. |
+| `show_help` | `bool` | `True` | Show the help button and enable the <kbd>H</kbd> interactive controls overlay. *(added in v0.2.0)* |
+| `recording_tools` | `bool` | `False` | Show screenshot (PNG) and video recording (WebM/MP4) buttons in the viewer toolbar. *(added in v0.2.0)* |
+| `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. *(added in v0.2.0)* |
+| `record_include_bgd` | `bool` | `False` | Include the background color in exported screenshots and video recordings (default is `False` for transparent backgrounds). *(added in v0.2.0)* |
+| `record_include_ui` | `bool` | `False` | Include all viewer UI elements (playback controls, info panel, measurements, labels) in exported screenshots and video recordings. *(added in v0.2.0)* |
 
 ---
 
-### Configuration Presets (TOML / Dict)
+### Configuration Presets (TOML / Dict) *(added in v0.2.0)*
 
 You can maintain reusable visual presets across your notebooks using TOML strings, `.toml` files, or dictionaries:
 
@@ -240,7 +240,7 @@ uv run marimo edit examples/01_interactive_molecule_viewer.py
 | [`01_interactive_molecule_viewer.py`](examples/01_interactive_molecule_viewer.py) | Molecule visualization with UI controls (styles, themes, outlines, auto-spin) and two-way reactivity. |
 | [`02_trajectory_and_animation.py`](examples/02_trajectory_and_animation.py) | Multi-frame vibrational trajectory with media controls, scrubbable timeline, and video recording. |
 | [`03_crystal_structures_and_extra_data.py`](examples/03_crystal_structures_and_extra_data.py) | Periodic crystal lattices with unit cell wireframes, depth fog, and automated crystallographic metrics. |
-| [`04_toml_presets_and_themes.py`](examples/04_toml_presets_and_themes.py) | Reusable visual presets loaded from TOML via `config` with parameter overrides. |
+| [`04_toml_presets_and_themes.py`](examples/04_toml_presets_and_themes.py) | Reusable visual presets loaded from TOML via `config` with parameter overrides. *(added in v0.2.0)* |
 
 ---
 

@@ -2587,8 +2587,9 @@ def view_structure(
     config : dict, str, or os.PathLike, optional
         A dictionary, path to a TOML file (PathLike or str), or a TOML formatted string containing configuration
         settings. Default is None. Any explicitly provided arguments to view_structure will override the settings in config.
+        *(added in v0.2.0)*
     style : str or dict, optional
-        Style options: 'ball-and-stick' (default), 'vdw', 'wireframe', or a custom dictionary.
+        Style options: 'ball-and-stick' (default), 'vdw', 'wireframe' or a custom dictionary.
     background_color : str, optional
         Background color of the viewer. Default is "white".
     show_axes : bool, optional
@@ -2630,15 +2631,15 @@ def view_structure(
         Whether to compute and display extra data (number of atoms, atomic weight for non-periodic;
         density, volume, number of atoms, and cell vector lengths for periodic structures). Default is False.
     show_help : bool, optional
-        Whether to show the help button and enable the 'h' interaction help overlay. Default is True.
+        Whether to show the help button and enable the 'h' interaction help overlay. Default is True. *(added in v0.2.0)*
     recording_tools : bool, optional
-        Whether to show screenshot (PNG) and animation video recording (WebM/MP4) tools in the viewer toolbar. Default is False.
+        Whether to show screenshot (PNG) and animation video recording (WebM/MP4) tools in the viewer toolbar. Default is False. *(added in v0.2.0)*
     dpi : int, optional
-        Resolution in dots per inch (DPI) for exported screenshots and video recordings. Default is 200.
+        Resolution in dots per inch (DPI) for exported screenshots and video recordings. Default is 200. *(added in v0.2.0)*
     record_include_bgd : bool, optional
-        Whether to include the viewer's background color in exported screenshots and video recordings (default is False, which produces transparent backgrounds).
+        Whether to include the viewer's background color in exported screenshots and video recordings (default is False, which produces transparent backgrounds). *(added in v0.2.0)*
     record_include_ui : bool, optional
-        Whether to include viewer UI elements (playback controls, info panels, measurement badges, labels) in exported screenshots and video recordings. Default is False.
+        Whether to include viewer UI elements (playback controls, info panels, measurement badges, labels) in exported screenshots and video recordings. Default is False. *(added in v0.2.0)*
 
     Returns
     -------

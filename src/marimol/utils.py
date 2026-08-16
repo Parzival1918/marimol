@@ -470,6 +470,8 @@ def parse_toml_config(config: dict | str | os.PathLike) -> dict:
     """
     Parse a TOML configuration from a dictionary, a file path (PathLike or str), or a TOML formatted string.
 
+    *(added in v0.2.0)*
+
     Parameters
     ----------
     config : dict, str, or os.PathLike
