@@ -38,5 +38,9 @@ lint:
 format:
     uv run ruff format
 
+# Check code format is correct (for CI/CD pipeline)
+check-format:
+    uv run ruff format --check
+
 # Run linter and tests
 check: lint test
