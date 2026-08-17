@@ -163,3 +163,24 @@ def test_view_structure_nested_style_config(methane_dict):
     inner = ui_widget.widget
     assert isinstance(inner, MoleculeViewerWidget)
     assert inner.style == {"bond_radius": 0.2, "use_vdw_radii": True}
+
+
+def test_view_structure_clip_distance(methane_dict):
+    # Default clip_distance (disabled = 0.0)
+    ui_default = view_structure(methane_dict)
+    assert ui_default.widget.clip_distance == 0.0
+
+    # Explicit clip_distance
+    ui_custom = view_structure(methane_dict, clip_distance=5.0)
+    assert ui_custom.widget.clip_distance == 5.0
+
+    # From TOML config
+    toml_str = """
+    clip_distance = 12.5
+    """
+    ui_cfg = view_structure(methane_dict, config=toml_str)
+    assert ui_cfg.widget.clip_distance == 12.5
+
+    # Overwrite config (including explicitly disabling with 0.0)
+    ui_over = view_structure(methane_dict, config=toml_str, clip_distance=0.0)
+    assert ui_over.widget.clip_distance == 0.0

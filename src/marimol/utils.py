@@ -252,35 +252,35 @@ def compute_bonds(data: dict, use_pbc: bool = False) -> list[dict]:
         ]
     )
 
-    bonds = []
-    has_pbc = False
+    shifts = np.zeros((1, 3))
     if use_pbc and unit_cell:
         try:
-            unit_cell_arr = np.array(unit_cell, dtype=float)
-            inv_cell = np.linalg.inv(unit_cell_arr)
-            frac_pos = pos_arr @ inv_cell
-            has_pbc = True
-        except (ValueError, np.linalg.LinAlgError):
+            uc = np.array(unit_cell, dtype=float)
+            if uc.shape == (3, 3) and abs(np.linalg.det(uc)) > 1e-6:
+                shifts = np.array(
+                    [
+                        nx * uc[0] + ny * uc[1] + nz * uc[2]
+                        for nx in (-1, 0, 1)
+                        for ny in (-1, 0, 1)
+                        for nz in (-1, 0, 1)
+                    ]
+                )
+        except (ValueError, TypeError):
             pass
 
+    bonds = []
     for i in range(num_atoms):
         rA = radii[i]
         j_indices = np.arange(i + 1, num_atoms)
         if len(j_indices) == 0:
             break
 
-        if has_pbc:
-            df = frac_pos[i] - frac_pos[j_indices]
-            df -= np.round(df)
-            dc = df @ unit_cell_arr
-        else:
-            dc = pos_arr[i] - pos_arr[j_indices]
-
-        dist = np.linalg.norm(dc, axis=1)
+        diffs = (pos_arr[j_indices, None, :] + shifts[None, :, :]) - pos_arr[i]
+        dists_sq = np.sum(diffs**2, axis=2)
+        min_dists = np.sqrt(np.min(dists_sq, axis=1))
 
         thresholds = (rA + radii[j_indices]) * 1.3
-
-        connected = np.where((dist > 0.1) & (dist < thresholds))[0]
+        connected = np.where((min_dists > 0.1) & (min_dists < thresholds))[0]
         for idx in connected:
             j = int(j_indices[idx])
             bonds.append({"source": i, "target": j})
@@ -310,9 +310,18 @@ def _center_molecules(
 
 
 def _unwrap_components(
-    num_atoms: int, adj: dict, positions: np.ndarray, inv_cell: np.ndarray, unit_cell: np.ndarray
+    num_atoms: int, adj: dict[int, list[int]], positions: np.ndarray, unit_cell: np.ndarray
 ) -> list[list[int]]:
     """Perform BFS to find connected components and unwrap them."""
+    shifts = np.array(
+        [
+            nx * unit_cell[0] + ny * unit_cell[1] + nz * unit_cell[2]
+            for nx in (-1, 0, 1)
+            for ny in (-1, 0, 1)
+            for nz in (-1, 0, 1)
+        ]
+    )
+
     visited = np.zeros(num_atoms, dtype=bool)
     molecules = []
 
@@ -328,10 +337,10 @@ def _unwrap_components(
                     if not visited[neighbor]:
                         visited[neighbor] = True
 
-                        # Unwrap neighbor relative to curr
-                        df = (positions[neighbor] - positions[curr]) @ inv_cell
-                        df -= np.round(df)
-                        positions[neighbor] = positions[curr] + df @ unit_cell
+                        cands = positions[neighbor] + shifts
+                        dists_sq = np.sum((cands - positions[curr]) ** 2, axis=1)
+                        best_idx = int(np.argmin(dists_sq))
+                        positions[neighbor] = cands[best_idx]
 
                         queue.append(neighbor)
             molecules.append(comp)
@@ -365,7 +374,7 @@ def unwrap_molecules(data: dict) -> dict:
     if not bonds:
         bonds = compute_bonds(data, use_pbc=True)
 
-    adj = {i: [] for i in range(num_atoms)}
+    adj: dict[int, list[int]] = {i: [] for i in range(num_atoms)}
     for bond in bonds:
         u, v = bond["source"], bond["target"]
         adj[u].append(v)
@@ -375,7 +384,7 @@ def unwrap_molecules(data: dict) -> dict:
     new_data = copy.deepcopy(data)
     new_positions = np.array(new_data["positions"], dtype=float)
 
-    molecules = _unwrap_components(num_atoms, adj, new_positions, inv_cell, unit_cell)
+    molecules = _unwrap_components(num_atoms, adj, new_positions, unit_cell)
 
     # 3. Center each molecule
     _center_molecules(new_positions, molecules, inv_cell, unit_cell)
@@ -384,9 +393,48 @@ def unwrap_molecules(data: dict) -> dict:
     return new_data
 
 
+def _compute_periodic_extra_data(cell_arr: np.ndarray, num_atoms: int, total_atomic_weight: float) -> dict:
+    a_len = float(np.linalg.norm(cell_arr[0]))
+    b_len = float(np.linalg.norm(cell_arr[1]))
+    c_len = float(np.linalg.norm(cell_arr[2]))
+    alpha = np.arccos(np.dot(cell_arr[1], cell_arr[2]) / (b_len * c_len)) * 180 / np.pi
+    beta = np.arccos(np.dot(cell_arr[0], cell_arr[2]) / (a_len * c_len)) * 180 / np.pi
+    gamma = np.arccos(np.dot(cell_arr[0], cell_arr[1]) / (a_len * b_len)) * 180 / np.pi
+    volume = float(abs(np.linalg.det(cell_arr)))
+    # Density in g/cm³: (mass_g_per_mol) / (volume_A3 * N_A * 1e-24)
+    # N_A * 1e-24 = 0.602214076
+    density = float(total_atomic_weight / (volume * 0.602214076)) if volume > 0 else 0.0
+
+    return {
+        "density": density,
+        "volume": volume,
+        "nº atoms": int(num_atoms),
+        "a": a_len,
+        "b": b_len,
+        "c": c_len,
+        "alpha": alpha,
+        "beta": beta,
+        "gamma": gamma,
+    }
+
+
+def _get_valid_unit_cell(unit_cell) -> np.ndarray | None:
+    if not unit_cell:
+        return None
+    try:
+        cell_arr = np.array(unit_cell, dtype=float)
+        if cell_arr.shape == (3, 3) and abs(np.linalg.det(cell_arr)) > 1e-6:
+            return cell_arr
+    except (ValueError, TypeError, np.linalg.LinAlgError):
+        pass
+    return None
+
+
 def compute_extra_data(data: dict) -> dict:
     """
     Compute extra data for a structure and add it to its 'extra_data' dictionary.
+    If the user has defined values in 'extra_data' that clash with those computed,
+    the user-provided value is kept.
 
     For non-periodic structures:
         - number_of_atoms: total number of atoms
@@ -421,47 +469,21 @@ def compute_extra_data(data: dict) -> dict:
 
     species = data.get("species", [])
     positions = data.get("positions", [])
-    unit_cell = data.get("unit_cell")
-
     num_atoms = len(positions) if positions else len(species)
     total_atomic_weight = float(sum(ATOMIC_WEIGHTS.get(str(s).strip().capitalize(), 0.0) for s in species))
 
-    is_periodic = False
-    cell_arr = None
-    if unit_cell:
-        try:
-            cell_arr = np.array(unit_cell, dtype=float)
-            if cell_arr.shape == (3, 3):
-                vol = float(abs(np.linalg.det(cell_arr)))
-                if vol > 1e-6:
-                    is_periodic = True
-        except (ValueError, TypeError, np.linalg.LinAlgError):
-            is_periodic = False
-
-    if is_periodic and cell_arr is not None:
-        a_len = float(np.linalg.norm(cell_arr[0]))
-        b_len = float(np.linalg.norm(cell_arr[1]))
-        c_len = float(np.linalg.norm(cell_arr[2]))
-        alpha = np.arccos(np.dot(cell_arr[1], cell_arr[2]) / (b_len * c_len)) * 180 / np.pi
-        beta = np.arccos(np.dot(cell_arr[0], cell_arr[2]) / (a_len * c_len)) * 180 / np.pi
-        gamma = np.arccos(np.dot(cell_arr[0], cell_arr[1]) / (a_len * b_len)) * 180 / np.pi
-        volume = float(abs(np.linalg.det(cell_arr)))
-        # Density in g/cm³: (mass_g_per_mol) / (volume_A3 * N_A * 1e-24)
-        # N_A * 1e-24 = 0.602214076
-        density = float(total_atomic_weight / (volume * 0.602214076)) if volume > 0 else 0.0
-
-        data["extra_data"]["density"] = density
-        data["extra_data"]["volume"] = volume
-        data["extra_data"]["nº atoms"] = int(num_atoms)
-        data["extra_data"]["a"] = a_len
-        data["extra_data"]["b"] = b_len
-        data["extra_data"]["c"] = c_len
-        data["extra_data"]["alpha"] = alpha
-        data["extra_data"]["beta"] = beta
-        data["extra_data"]["gamma"] = gamma
+    cell_arr = _get_valid_unit_cell(data.get("unit_cell"))
+    if cell_arr is not None:
+        defaults = _compute_periodic_extra_data(cell_arr, num_atoms, total_atomic_weight)
     else:
-        data["extra_data"]["nº atoms"] = int(num_atoms)
-        data["extra_data"]["atomic weight"] = total_atomic_weight
+        defaults = {
+            "nº atoms": int(num_atoms),
+            "atomic weight": total_atomic_weight,
+        }
+
+    for k, v in defaults.items():
+        if k not in data["extra_data"]:
+            data["extra_data"][k] = v
 
     return data["extra_data"]
 
@@ -469,6 +491,8 @@ def compute_extra_data(data: dict) -> dict:
 def parse_toml_config(config: dict | str | os.PathLike) -> dict:
     """
     Parse a TOML configuration from a dictionary, a file path (PathLike or str), or a TOML formatted string.
+
+    *(added in v0.2.0)*
 
     Parameters
     ----------
@@ -500,3 +524,134 @@ def parse_toml_config(config: dict | str | os.PathLike) -> dict:
             return tomllib.loads(config)
 
     raise TypeError(f"Expected dict, str, or os.PathLike for config, got {type(config).__name__}")
+
+
+def _resolve_vector_point(
+    val: object, positions: list[list[float]], num_atoms: int, idx: int, name: str
+) -> list[float]:
+    """Helper to convert atom index or 3D coordinate list to [float, float, float]."""
+    if isinstance(val, (int, np.integer)) and not isinstance(val, bool):
+        orig_idx = int(val)
+        if not (0 <= orig_idx < num_atoms):
+            raise IndexError(
+                f"Vector entry {idx} {name} atom index {orig_idx} is out of bounds (structure has {num_atoms} atoms)"
+            )
+        return [float(x) for x in positions[orig_idx]]
+    if isinstance(val, (list, tuple, np.ndarray)):
+        if len(val) != 3:
+            raise ValueError(f"Vector entry {idx} {name} coordinate list must have length 3, got length {len(val)}")
+        return [float(x) for x in val]
+    raise TypeError(
+        f"Vector entry {idx} {name} must be an atom index (int) or 3D coordinate list, got {type(val).__name__}"
+    )
+
+
+def _resolve_vector_geometry(
+    v: dict, positions: list[list[float]], num_atoms: int, idx: int
+) -> tuple[list[float], list[float], list[float], float]:
+    """Helper to compute (origin, end, direction, length) for a vector entry."""
+    if "origin" not in v:
+        raise ValueError(f"Vector entry at index {idx} is missing required 'origin' key")
+
+    origin_pos = _resolve_vector_point(v["origin"], positions, num_atoms, idx, "origin")
+
+    if "end" in v:
+        end_pos = _resolve_vector_point(v["end"], positions, num_atoms, idx, "end")
+        dx = end_pos[0] - origin_pos[0]
+        dy = end_pos[1] - origin_pos[1]
+        dz = end_pos[2] - origin_pos[2]
+        length = float(np.sqrt(dx * dx + dy * dy + dz * dz))
+        direction = [dx / length, dy / length, dz / length] if length > 1e-12 else [0.0, 0.0, 0.0]
+        return origin_pos, end_pos, direction, length
+
+    if "direction" in v:
+        dir_val = v["direction"]
+        if not isinstance(dir_val, (list, tuple, np.ndarray)) or len(dir_val) != 3:
+            raise ValueError(f"Vector entry {idx} direction must be a 3D coordinate list [dx, dy, dz], got {dir_val}")
+        raw_dir = [float(x) for x in dir_val]
+        norm = float(np.sqrt(sum(d * d for d in raw_dir)))
+        length = float(v["length"]) if "length" in v else norm
+        direction = [d / norm for d in raw_dir] if norm > 1e-12 else [0.0, 0.0, 0.0]
+        end_pos = [origin_pos[i] + direction[i] * length for i in range(3)]
+        return origin_pos, end_pos, direction, length
+
+    raise ValueError(
+        f"Vector entry {idx} must specify either 'end' (atom index or [x, y, z]) or 'direction' (and optional 'length')"
+    )
+
+
+def _resolve_vector_styling(
+    v: dict, data: dict, default_width: float, default_outline: bool | str, default_color: str
+) -> tuple[float, bool | str, str]:
+    """Helper to resolve (width, outline, color) for a vector entry."""
+    width = float(v.get("width", data.get("vector_width", default_width)))
+    outline = v.get("outline", data.get("vector_outline", default_outline))
+    raw_col = v.get("color", data.get("vector_color", default_color))
+    color = resolve_color(raw_col)
+    return width, outline, color
+
+
+def process_vectors(
+    data: dict,
+    default_width: float = 0.08,
+    default_outline: bool | str = False,
+    default_color: str = "red",
+) -> list[dict]:
+    """
+    Process and validate vector dictionaries for 3D visualization.
+
+    Converts atom indices in 'origin' and 'end' to Cartesian coordinates, computes
+    vector directions and lengths, and resolves styling hierarchy (per-vector > per-frame > global defaults).
+
+    *(added in v0.3.0)*
+
+    Parameters
+    ----------
+    data : dict
+        A structure dictionary containing 'positions' and optional 'vectors', 'vector_width',
+        'vector_outline', and 'vector_color'.
+    default_width : float, optional
+        Default shaft radius / width for vectors. Default is 0.08.
+    default_outline : bool or str, optional
+        Default outline setting for vectors (False, True, or custom color string). Default is False.
+    default_color : str, optional
+        Default color name or hex code for vectors. Default is "red".
+
+    Returns
+    -------
+    list[dict]
+        A list of processed vector dictionaries ready for MoleculeViewerWidget, where each
+        dictionary contains 'origin' ([x, y, z]), 'end' ([x, y, z]), 'direction' ([dx, dy, dz]),
+        'length' (float), 'width' (float), 'outline' (bool or str), and 'color' (str).
+    """
+    if not isinstance(data, dict):
+        return []
+
+    raw_vectors = data.get("vectors")
+    if not raw_vectors or not isinstance(raw_vectors, list):
+        return []
+
+    positions = data.get("positions", [])
+    num_atoms = len(positions)
+
+    processed = []
+    for idx, v in enumerate(raw_vectors):
+        if not isinstance(v, dict):
+            raise TypeError(f"Vector entry at index {idx} must be a dictionary, got {type(v).__name__}")
+
+        origin_pos, end_pos, direction, length = _resolve_vector_geometry(v, positions, num_atoms, idx)
+        width, outline, color = _resolve_vector_styling(v, data, default_width, default_outline, default_color)
+
+        processed.append(
+            {
+                "origin": origin_pos,
+                "end": end_pos,
+                "direction": direction,
+                "length": length,
+                "width": width,
+                "outline": outline,
+                "color": color,
+            }
+        )
+
+    return processed

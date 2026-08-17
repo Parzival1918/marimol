@@ -28,8 +28,8 @@ For a more in depth documentation which includes interactive examples see: [mari
 - 🧊 **Crystallography & Periodic Boundaries**: Unit cell bounding boxes, crystallographic lattice vector indicators ($a, b, c$), and automatic molecule unwrapping across periodic boundary conditions (`unwrap_molecules=True`).
 - 🎨 **Visual Styles & Cel Shading**: Ball-and-stick, Van der Waals (VDW), wireframe, stylized cartoon silhouette outlines (`draw_outlines=True`), atom element/index labels (`draw_labels=True`), depth fog, and custom styles.
 - 📊 **Metadata Drawer**: Instant inspection of unit cell parameters ($a, b, c, \alpha, \beta, \gamma$), volume, density, and custom calculation results.
-- 📸 **Image Capture & Video Recording**: High-resolution PNG screenshots (<kbd>S</kbd>) and WebM/MP4 animation recordings (<kbd>R</kbd>) of trajectories or auto-spin loops directly to your downloads.
-- ❓ **Interactive Help & Controls Overlay**: Built-in cheatsheet of all keyboard and mouse interactions (toggle with <kbd>H</kbd> or the <kbd>?</kbd> button).
+- 📸 **Image Capture & Video Recording** *(added in v0.2.0)*: High-resolution PNG screenshots (<kbd>S</kbd>) and WebM/MP4 animation recordings (<kbd>R</kbd>) of trajectories or auto-spin loops directly to your downloads.
+- ❓ **Interactive Help & Controls Overlay** *(added in v0.2.0)*: Built-in cheatsheet of all keyboard and mouse interactions (toggle with <kbd>H</kbd> or the <kbd>?</kbd> button).
 
 ---
 
@@ -96,6 +96,10 @@ data = {
     "positions": [[0.0, 0.0, 0.0], [1.1, 0.0, 0.0]],
     "species": ["C", "O"],
     "bonds": [{"source": 0, "target": 1}],
+    # Optional 3D vector arrows (origin, end/direction, length, styling) *(added in v0.3.0)*
+    "vectors": [
+        {"origin": 0, "direction": [0.0, 0.0, 1.0], "length": 1.5, "color": "yellow", "outline": True},
+    ],
 }
 
 view_structure(data)
@@ -140,10 +144,10 @@ f"Currently viewing trajectory frame: {current_step}"
 | **Snap View to Axis** | Click **X**, **Y**, or **Z** on the bottom-left coordinate triad |
 | **Measurement Tool** | Click the **Ruler icon** (top-right), then pick 2 (dist), 3 (angle), or 4 (dihedral) atoms |
 | **Extra Data Drawer** | Click the **List icon** (top-right) to expand the metadata drawer |
-| **Capture Screenshot** | Click the **Camera icon** or press <kbd>S</kbd> (when `recording_tools=True`) |
-| **Record Animation** | Click the **Video icon** or press <kbd>R</kbd> (when `recording_tools=True`) |
-| **Help & Shortcuts** | Press <kbd>H</kbd> or click the <kbd>?</kbd> icon to open the controls overlay |
-| **Close Help** | Press <kbd>Esc</kbd> or click outside the modal |
+| **Capture Screenshot** | Click the **Camera icon** or press <kbd>S</kbd> (when `recording_tools=True`) *(added in v0.2.0)* |
+| **Record Animation** | Click the **Video icon** or press <kbd>R</kbd> (when `recording_tools=True`) *(added in v0.2.0)* |
+| **Help & Shortcuts** | Press <kbd>H</kbd> or click the <kbd>?</kbd> icon to open the controls overlay *(added in v0.2.0)* |
+| **Close Help** | Press <kbd>Esc</kbd> or click outside the modal *(added in v0.2.0)* |
 
 ---
 
@@ -154,7 +158,7 @@ All viewer functions (`view_structure`, `view_ase`, `view_pymatgen`, `view_cspy`
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `data` / `atoms` / `structure` | `dict` \| `list[dict]` | *Required* | Structure dictionary, list of dictionaries, or external library structure object. |
-| `config` | `dict` \| `str` \| `PathLike` | `None` | Configuration dictionary, TOML string, or path to a `.toml` file. Explicit arguments will overwrite config settings. |
+| `config` | `dict` \| `str` \| `PathLike` | `None` | Configuration dictionary, TOML string, or path to a `.toml` file. Explicit arguments will overwrite config settings. *(added in v0.2.0)* |
 | `style` | `str` \| `dict` | `"ball-and-stick"` | Representation style: `"ball-and-stick"`, `"vdw"`, `"wireframe"`, or custom `dict`. |
 | `background_color` | `str` | `"white"` | Viewport background color (e.g. `"white"`, `"black"`, `"#1e1e1e"`, `"transparent"`). |
 | `show_axes` | `bool` | `False` | Display interactive XYZ coordinate triad in the bottom-left corner. |
@@ -164,10 +168,15 @@ All viewer functions (`view_structure`, `view_ase`, `view_pymatgen`, `view_cspy`
 | `viewer_outline` | `bool` \| `str` | `False` | Draw border around the viewport. `True` for subtle border or CSS border string. |
 | `fog` | `bool` | `False` | Distance fog effect for depth cueing in large lattices. |
 | `fog_strength` | `float` | `0.5` | Strength of the fog effect ($0.0$ to $1.0$). |
+| `clip_distance` | `float` | `0.0` | Near camera clipping plane distance in Å. If `0.0` (default), near clipping is disabled. If positive, clips atoms closer to the camera than this distance. *(added in v0.3.0)* |
 | `draw_outlines` | `bool` | `False` | Stylized cartoon / cel-shaded silhouette outlines around atoms and bonds. |
 | `draw_labels` | `bool` | `False` | Element and index labels on atoms with 3D occlusion testing. |
 | `measuring_tool` | `bool` | `False` | Enable ruler button in the top-right toolbar for distance and angle measurements. |
 | `unwrap_molecules` | `bool` | `False` | Unwrap molecules split across periodic unit cell boundary conditions. |
+| `structure_transparency` | `float` | `0.0` | Transparency level for atoms and bonds ($0.0$ opaque to $1.0$ fully transparent), useful for viewing internal vectors. *(added in v0.3.0)* |
+| `vector_width` | `float` | `0.08` | Shaft radius / width for 3D vector arrows. *(added in v0.3.0)* |
+| `vector_outline` | `bool` \| `str` | `False` | Whether to draw outlines around 3D vector arrows (or outline color string). *(added in v0.3.0)* |
+| `vector_color` | `str` | `"red"` | Default color name or hex code for 3D vector arrows. *(added in v0.3.0)* |
 | `spin` | `bool` | `False` | Continuous automatic 3D rotation of the structure. |
 | `spin_axis` | `tuple[float, float, float]` | `(0.0, 1.0, 0.0)` | Cartesian 3D axis vector around which the structure rotates during spin. |
 | `spin_speed` | `float` | `2.0` | Angular rotation speed for auto-spin (positive for CW, negative for CCW). |
@@ -175,15 +184,16 @@ All viewer functions (`view_structure`, `view_ase`, `view_pymatgen`, `view_cspy`
 | `traj_fps` | `float` | `10.0` | Playback speed in frames per second for trajectory animations. |
 | `trajectory_slider` | `bool` | `False` | Scrubbable timeline slider in the trajectory control bar. |
 | `compute_extra_data` | `bool` | `False` | Automatically compute density, volume, lattice lengths & angles, atom count, and MW for the metadata drawer. |
-| `show_help` | `bool` | `True` | Show the help button and enable the <kbd>H</kbd> interactive controls overlay. |
-| `recording_tools` | `bool` | `False` | Show screenshot (PNG) and video recording (WebM/MP4) buttons in the viewer toolbar. |
-| `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. |
-| `record_include_bgd` | `bool` | `False` | Include the background color in exported screenshots and video recordings (default is `False` for transparent backgrounds). |
-| `record_include_ui` | `bool` | `False` | Include all viewer UI elements (playback controls, info panel, measurements, labels) in exported screenshots and video recordings. |
+| `extra_data` | `Callable[[T], dict]` | `None` | Custom callable accepting the structure/object and returning a dictionary of metadata for the extra data drawer (only available in `view_ase`, `view_pymatgen`, `view_cspy`). *(added in v0.3.0)* |
+| `show_help` | `bool` | `True` | Show the help button and enable the <kbd>H</kbd> interactive controls overlay. *(added in v0.2.0)* |
+| `recording_tools` | `bool` | `False` | Show screenshot (PNG) and video recording (WebM/MP4) buttons in the viewer toolbar. *(added in v0.2.0)* |
+| `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. *(added in v0.2.0)* |
+| `record_include_bgd` | `bool` | `False` | Include the background color in exported screenshots and video recordings (default is `False` for transparent backgrounds). *(added in v0.2.0)* |
+| `record_include_ui` | `bool` | `False` | Include all viewer UI elements (playback controls, info panel, measurements, labels) in exported screenshots and video recordings. *(added in v0.2.0)* |
 
 ---
 
-### Configuration Presets (TOML / Dict)
+### Configuration Presets (TOML / Dict) *(added in v0.2.0)*
 
 You can maintain reusable visual presets across your notebooks using TOML strings, `.toml` files, or dictionaries:
 
@@ -240,7 +250,9 @@ uv run marimo edit examples/01_interactive_molecule_viewer.py
 | [`01_interactive_molecule_viewer.py`](examples/01_interactive_molecule_viewer.py) | Molecule visualization with UI controls (styles, themes, outlines, auto-spin) and two-way reactivity. |
 | [`02_trajectory_and_animation.py`](examples/02_trajectory_and_animation.py) | Multi-frame vibrational trajectory with media controls, scrubbable timeline, and video recording. |
 | [`03_crystal_structures_and_extra_data.py`](examples/03_crystal_structures_and_extra_data.py) | Periodic crystal lattices with unit cell wireframes, depth fog, and automated crystallographic metrics. |
-| [`04_toml_presets_and_themes.py`](examples/04_toml_presets_and_themes.py) | Reusable visual presets loaded from TOML via `config` with parameter overrides. |
+| [`04_toml_presets_and_themes.py`](examples/04_toml_presets_and_themes.py) | Reusable visual presets loaded from TOML via `config` with parameter overrides. *(added in v0.2.0)* |
+| [`05_cspy_crystal_generation_and_custom_extra_data.py`](examples/05_cspy_crystal_generation_and_custom_extra_data.py) | Crystal structure generation across space groups with custom `extra_data` callable. *(added in v0.3.0)* |
+| [`06_vector_data_and_arrows.py`](examples/06_vector_data_and_arrows.py) | 3D vector arrows for molecular dipole moments, vibrational forces, magnetic spins, and transparency. *(added in v0.3.0)* |
 
 ---
 
@@ -258,14 +270,18 @@ uv run just docs-edit
 
 Contributions to **marimol** are very welcome! Whether you are reporting issues, adding support for new computational chemistry packages, improving WebGL performance, or enhancing documentation, here is how to get started:
 
+> [!IMPORTANT]
+> **Branching Model**: Active development takes place on the **`dev`** branch. All new feature branches and pull requests should be based on and opened against **`dev`**. The **`main`** branch is reserved for stable releases; changes in `dev` will be merged into `main` when a new release candidate is ready.
+
 ### 1. Fork and clone the repository
 
 1. Fork the [marimol repository](https://github.com/Parzival1918/marimol) to your own GitHub account by clicking the **Fork** button on GitHub.
-2. Clone your personal fork locally:
+2. Clone your personal fork locally and switch to the `dev` branch:
 
 ```bash
 git clone https://github.com/<your-username>/marimol.git
 cd marimol
+git checkout dev
 ```
 
 ### 2. Set up the development environment & pre-commit hooks
@@ -328,10 +344,28 @@ uv run just docs-build
 
 ### 6. Submitting a Pull Request
 
-1. Create a feature branch on your fork: `git checkout -b feature/my-new-feature`
-2. Make your changes and commit them: `git commit -m "feat: add support for XYZ"`
-3. Push to your fork: `git push origin feature/my-new-feature`
-4. Open a Pull Request from your branch to the `main` branch of [Parzival1918/marimol](https://github.com/Parzival1918/marimol).
+1. Make sure your local `dev` branch is up to date:
+   ```bash
+   git checkout dev
+   git pull origin dev
+   ```
+2. Create a feature branch branching off `dev`:
+   ```bash
+   git checkout -b feature/my-new-feature
+   ```
+3. Make your changes and commit them:
+   ```bash
+   git commit -m "feat: add support for XYZ"
+   ```
+4. Run checks to verify code formatting and tests:
+   ```bash
+   uv run just check
+   ```
+5. Push to your fork:
+   ```bash
+   git push origin feature/my-new-feature
+   ```
+6. Open a Pull Request from your feature branch to the **`dev`** branch of [Parzival1918/marimol](https://github.com/Parzival1918/marimol).
 
 ---
 

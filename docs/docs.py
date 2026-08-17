@@ -6,7 +6,12 @@ app = marimo.App()
 with app.setup:
     import marimo as mo
     import numpy as np
+    from ase import units
     from ase.build import bulk, molecule
+    from ase.calculators.emt import EMT
+    from ase.cluster import Icosahedron
+    from ase.md.velocitydistribution import Stationary, ZeroRotation, thermalize_momenta
+    from ase.md.verlet import VelocityVerlet
     from cspy import Molecule
     from cspy.crystal.generate_crystal import CrystalGenerator
     from marimol import parse_toml_config, view_ase, view_cspy, view_pymatgen, view_structure
@@ -114,10 +119,10 @@ def _():
       - Click the ruler button again or click empty canvas space to exit measurement mode.
     - **Extra Data Drawer**:
       - Click the **List icon** in the top-right overlay to expand the metadata drawer, showing properties such as unit cell volume, density, lattice parameters ($a, b, c, \alpha, \beta, \gamma$), atom counts, or custom calculation results.
-    - **Capture & Recording Tools**:
+    - **Capture & Recording Tools** *(added in v0.2.0)*:
       - Click the **Camera icon** (or press <kbd>S</kbd>) to save a high-resolution PNG screenshot directly to your downloads.
       - Click the **Video icon** (or press <kbd>R</kbd>) to record WebM/MP4 animations of trajectory playback or auto-spin, or to record your manual interactions with the structure.
-    - **Help & Controls Overlay**:
+    - **Help & Controls Overlay** *(added in v0.2.0)*:
       - Press the <kbd>H</kbd> key while hovering over the viewer or click the **Question Mark icon** in the top-right overlay to display an interactive summary of all navigation, selection, measuring, recording, trajectory, and axis controls.
     - **Trajectory Controls**:
       - When visualizing a list of frames, a media player overlay appears with buttons for First, Previous, Play/Pause, Next, and Last frame, as well as an optional scrubbable frame slider.
@@ -131,7 +136,7 @@ def _():
     | Parameter | Type | Default | Description |
     | :--- | :--- | :--- | :--- |
     | `data` / `atoms` / `structure` | `dict` \| `list[dict]` | *Required* | Structure dictionary or list of dictionaries (or `ase.Atoms`, `pymatgen.core.Structure`, `cspy.Crystal` / `cspy.Molecule`). |
-    | `config` | `dict` \| `str` \| `PathLike` | `None` | Reusable configuration dictionary, TOML string, or path to a TOML file. Explicit keyword arguments will override config values. |
+    | `config` | `dict` \| `str` \| `PathLike` | `None` | Reusable configuration dictionary, TOML string, or path to a TOML file. Explicit keyword arguments will override config values. *(added in v0.2.0)* |
     | `style` | `str` \| `dict` | `"ball-and-stick"` | Visual representation style: `"ball-and-stick"`, `"vdw"`, `"wireframe"`, or a custom style dictionary. |
     | `background_color` | `str` | `"white"` | Viewport background color (e.g. `"white"`, `"black"`, `"transparent"`, `"#1e1e1e"`). |
     | `show_axes` | `bool` | `False` | Whether to display the interactive XYZ coordinate triad in the bottom-left corner. |
@@ -141,10 +146,15 @@ def _():
     | `viewer_outline` | `bool` \| `str` | `False` | Draws a border around the viewer container. Set `True` for a subtle grey outline or pass a CSS border string (e.g. `"1px solid #ccc"`). |
     | `fog` | `bool` | `False` | Enables distance fog effect for depth cueing in large lattices. |
     | `fog_strength` | `float` | `0.5` | Strength of the fog effect (0.0 to 1.0). |
+    | `clip_distance` | `float` | `0.0` | Near camera clipping plane distance in Å. If `0.0` (default), near clipping is disabled. If positive, clips atoms closer to the camera than this distance. *(added in v0.3.0)* |
     | `draw_outlines` | `bool` | `False` | Draws stylized cartoon / cel-shaded silhouette outlines around atoms and bonds. |
     | `draw_labels` | `bool` | `False` | Displays element/index labels on top of atoms with 3D occlusion testing. |
     | `measuring_tool` | `bool` | `False` | Enables the ruler button in the top-right overlay for distance, angle, and dihedral measurements. |
     | `unwrap_molecules` | `bool` | `False` | Unwraps molecules split across periodic unit cell boundary conditions and centers whole molecules inside the cell. |
+    | `structure_transparency` | `float` | `0.0` | Transparency level for atoms and bonds between 0.0 (completely opaque) and 1.0 (fully transparent), useful for viewing internal vectors. *(added in v0.3.0)* |
+    | `vector_width` | `float` | `0.08` | Shaft radius / width for 3D vector arrows. *(added in v0.3.0)* |
+    | `vector_outline` | `bool` \| `str` | `False` | Whether to draw outlines around 3D vector arrows (or outline color string). *(added in v0.3.0)* |
+    | `vector_color` | `str` | `"red"` | Default color name or hex code for 3D vector arrows. *(added in v0.3.0)* |
     | `spin` | `bool` | `False` | Enables continuous automatic 3D rotation of the structure. |
     | `spin_axis` | `tuple[float, float, float]` | `(0.0, 1.0, 0.0)` | Cartesian 3D axis vector around which the structure rotates during auto-spin. |
     | `spin_speed` | `float` | `2.0` | Angular rotation speed for auto-spin (positive for clockwise, negative for counter-clockwise). |
@@ -152,11 +162,12 @@ def _():
     | `traj_fps` | `float` | `10.0` | Playback speed in frames per second for trajectory animations. |
     | `trajectory_slider` | `bool` | `False` | Displays a scrubbable timeline slider in the trajectory control bar. |
     | `compute_extra_data` | `bool` | `False` | Automatically computes physical/crystallographic properties (density, volume, lattice lengths & angles, atom count, molecular weight) for the info drawer. |
-    | `show_help` | `bool` | `True` | Whether to show the help button and enable the 'h' interaction help overlay. |
-    | `recording_tools` | `bool` | `False` | Whether to show screenshot (PNG) and animation video recording (WebM/MP4) buttons in the viewer toolbar. |
-    | `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. |
-    | `record_include_bgd` | `bool` | `False` | Whether to include the viewer's background color in exported screenshots and video recordings (default is `False` for transparent backgrounds). |
-    | `record_include_ui` | `bool` | `False` | Whether to include all viewer UI elements (playback controls, info panels, measurements, labels) in exported screenshots and video recordings. |
+    | `extra_data` | `Callable[[T], dict]` | `None` | Custom callable accepting the structure/object and returning a dictionary of metadata for the extra data drawer (only available in `view_ase`, `view_pymatgen`, `view_cspy`). *(added in v0.3.0)* |
+    | `show_help` | `bool` | `True` | Whether to show the help button and enable the 'h' interaction help overlay. *(added in v0.2.0)* |
+    | `recording_tools` | `bool` | `False` | Whether to show screenshot (PNG) and animation video recording (WebM/MP4) buttons in the viewer toolbar. *(added in v0.2.0)* |
+    | `dpi` | `int` | `200` | Resolution in dots per inch (DPI) for exported screenshots and video recordings. *(added in v0.2.0)* |
+    | `record_include_bgd` | `bool` | `False` | Whether to include the viewer's background color in exported screenshots and video recordings (default is `False` for transparent backgrounds). *(added in v0.2.0)* |
+    | `record_include_ui` | `bool` | `False` | Whether to include all viewer UI elements (playback controls, info panels, measurements, labels) in exported screenshots and video recordings. *(added in v0.2.0)* |
 
     ### Custom Style Dictionaries
 
@@ -218,6 +229,19 @@ def _():
             "energy": -40.512,
             "point_group": "Td",
         },
+
+        # [Optional] 3D vector arrows (e.g. dipole moments, forces, spins) *(added in v0.3.0)*
+        "vectors": [
+            # Arrow starting at atom 0 pointing in a given direction with explicit length
+            {"origin": 0, "direction": [0.0, 0.0, 1.0], "length": 1.5, "color": "yellow", "width": 0.10, "outline": True},
+            # Arrow between two Cartesian coordinate positions or atom indices
+            {"origin": [0.0, 0.0, 0.0], "end": [1.0, 1.0, 0.0], "color": "cyan"},
+        ],
+
+        # [Optional] Frame-level vector defaults *(added in v0.3.0)*
+        "vector_width": 0.08,
+        "vector_outline": False,
+        "vector_color": "red",
     }
     ```
 
@@ -501,9 +525,9 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### 5. mol-cspy Integration: Crystal Structure Generation with `CrystalGenerator`
+    ### 5. mol-cspy Integration: Crystal Generation & Custom Metadata
 
-    Visualizing predicted molecular crystal candidates generated with **mol-cspy**'s `CrystalGenerator` (`cspy.crystal.generate_crystal.CrystalGenerator`). Multiple candidate crystal structures are loaded as a collection with interactive trajectory navigation (`multi_traj=False`, `trajectory_slider=True`), and automated crystallographic data computation (`compute_extra_data=True`). Screen captures and recordings can be taken (`recording_tools=True`), and the background and UI elements are also included in the saved files (`record_include_bgd=True` and `record_include_ui=True`).
+    Visualizing predicted molecular crystal candidates generated with **mol-cspy**'s `CrystalGenerator` (`cspy.crystal.generate_crystal.CrystalGenerator`) across space groups 2 ($P\bar{1}$) and 14 ($P2_1/c$). Multiple candidate crystal structures are loaded with interactive trajectory navigation (`multi_traj=False`, `trajectory_slider=True`), automated physical property computation (`compute_extra_data=True`), and a custom **`extra_data` callable** *(feature added in v0.3.0)* that adds space group metadata and asymmetric unit molecule count ($Z'$) directly to the information drawer.
     """)
     return
 
@@ -528,19 +552,32 @@ def _():
     ''')
     mol.guess_bonds()
 
-    # 2. Generate candidate crystal polymorphs in space group P-1 (space group 2)
-    generator = CrystalGenerator([mol, mol], space_group=2)
+    # 2. Generate candidate crystal polymorphs in space groups 2 (P-1) and 14 (P2_1/c)
+    space_groups = [2, 14]
+    z_prime = 1  # Number of molecules in asymmetric unit
     crystals = []
-    for seed in range(1, 30):
-        candidate = generator.generate(seed)
-        if candidate is not None:
-            crystals.append(candidate)
-        if len(crystals) == 10:
-            break
+    for sg in space_groups:
+        generator = CrystalGenerator([mol] * z_prime, space_group=sg)
+        count = 0
+        for seed in range(1, 40):
+            candidate = generator.generate(seed)
+            if candidate is not None:
+                crystals.append(candidate)
+                count += 1
+                if count >= 3:
+                    break
 
-    # 3. Visualize the generated candidate crystals with frame slider & computed extra data
+    # 3. Define custom extra_data callable to attach space group to metadata drawer
+    def extract_crystal_extra_data(c):
+        return {
+            "space group": f"{c.space_group.international_tables_number} ({c.space_group.symbol})",
+            "Z' (asym molecules)": len(c.asym_mols()),
+        }
+
+    # 4. Visualize the candidate crystals with frame slider & custom extra data
     view_cspy(
         crystals,
+        extra_data=extract_crystal_extra_data,
         multi_traj=False,
         trajectory_slider=True,
         compute_extra_data=True,
@@ -566,20 +603,31 @@ def _():
     """)
     _mol.guess_bonds()
 
-    _generator = CrystalGenerator([_mol, _mol], space_group=2)
     _crystals = []
-    for _seed in range(1, 30):
-        _candidate = _generator.generate(_seed)
-        if _candidate is not None:
-            _crystals.append(_candidate)
-        if len(_crystals) == 10:
-            break
+    for _sg in [2, 14]:
+        _generator = CrystalGenerator([_mol], space_group=_sg)
+        _count = 0
+        for _seed in range(1, 40):
+            _candidate = _generator.generate(_seed)
+            if _candidate is not None:
+                _crystals.append(_candidate)
+                _count += 1
+                if _count >= 3:
+                    break
+
+    def _extract_crystal_extra_data(_c):
+        return {
+            "space group": f"{_c.space_group.international_tables_number} ({_c.space_group.symbol})",
+            "Z' (asym molecules)": len(_c.asym_mols()),
+        }
 
     _viewer = view_cspy(
         _crystals,
+        extra_data=_extract_crystal_extra_data,
         multi_traj=False,
         trajectory_slider=True,
         compute_extra_data=True,
+        unwrap_molecules=True,
         show_axes=True,
         viewer_outline=True,
         fog=True,
@@ -597,7 +645,7 @@ def _():
     mo.md(r"""
     ### 6. Config-Driven Visualization: Loading Settings from TOML & Dict
 
-    You can define reusable viewer styles and presets using Python dictionaries, TOML formatted strings, or `.toml` configuration files, and supply them via the `config` argument. Any explicitly passed arguments to the viewer will overwrite the settings specified in the configuration.
+    You can define reusable viewer styles and presets using Python dictionaries, TOML formatted strings, or `.toml` configuration files, and supply them via the `config` argument *(feature added in v0.2.0)*. Any explicitly passed arguments to the viewer will overwrite the settings specified in the configuration.
 
     The example below visualizes an ethanol ($\text{C}_2\text{H}_5\text{OH}$) molecule configured through a TOML string with custom background color, coordinate axes, auto-spin, and measurement & recording tools.
     """)
@@ -672,20 +720,209 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
+    ### 7. 3D Vector & Arrow Visualization
+
+    **marimol** allows rendering 3D vector arrows *(added in v0.3.0)* to visualize vector quantities such as molecular dipole moments, atomic forces, vibrational normal modes, magnetic spin vectors, and interatomic displacement vectors.
+
+    #### Specifying Vectors
+
+    Add an optional `"vectors"` entry to your structure dictionary containing a list of vector dictionaries:
+
+    - **`origin`**: Starting point of the arrow. Can be passed as an **atom index** (integer $\ge 0$) or as **3D Cartesian coordinates** (`[x, y, z]`).
+    - **`end`**: Destination point of the arrow. Can be passed as an **atom index** or **3D Cartesian coordinates**.
+    - **`direction` & `length`**: Alternative to `end`. Pass `direction` as a 3D vector (`[dx, dy, dz]`) and optionally `length` as a float. If `length` is omitted, the Euclidean norm of `direction` is used.
+
+    #### Styling & Precedence Hierarchy
+
+    Vector appearance can be configured at three levels (highest to lowest precedence):
+
+    1. **Per-vector keys** in the vector dictionary: `width`, `outline`, `color`.
+    2. **Per-frame keys** in the data dictionary: `vector_width`, `vector_outline`, `vector_color`.
+    3. **Global arguments** in `view_structure` / config: `vector_width` (default `0.08`), `vector_outline` (default `False`), `vector_color` (default `"red"`).
+
+    The example below visualizes a live **Molecular Dynamics (MD)** trajectory of a **Gold Nanoparticle ($\text{Au}_{13}$)** with instantaneous **atomic force vectors** color-coded by magnitude, rendered with structure transparency (`structure_transparency=0.35`):
+    """)
+    return
+
+
+@app.cell
+def _():
+    _code = mo.accordion({
+        "View Code": mo.md(r"""
+    ```python
+    import numpy as np
+    from ase import units
+    from ase.calculators.emt import EMT
+    from ase.cluster import Icosahedron
+    from ase.md.velocitydistribution import Stationary, ZeroRotation, thermalize_momenta
+    from ase.md.verlet import VelocityVerlet
+    from marimol import view_structure
+
+    # 1. Construct Au13 icosahedral gold nanoparticle
+    atoms = Icosahedron("Au", noshells=2)
+    atoms.set_cell([20.0, 20.0, 20.0])
+    atoms.center()
+    atoms.calc = EMT()
+
+    # 2. Thermalize and set up molecular dynamics (2 fs timestep)
+    thermalize_momenta(atoms, temperature_K=300)
+    Stationary(atoms)
+    ZeroRotation(atoms)
+
+    dt_fs = 2.0
+    dyn = VelocityVerlet(atoms, timestep=dt_fs * units.fs)
+
+    def get_force_color(force_mag: float, max_force: float) -> str:
+        ratio = min(1.0, max(0.0, force_mag / max_force)) if max_force > 0 else 0.0
+        r = int(255 * ratio)
+        g = int(220 * (1.0 - abs(ratio - 0.5) * 2.0))
+        b = int(255 * (1.0 - ratio))
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    # 3. Run 150 steps of MD and collect atomic force vectors
+    trajectory_frames = []
+    n_steps = 150
+    f_scale = 0.8
+
+    for step in range(n_steps):
+        dyn.run(1)
+        positions = atoms.get_positions().tolist()
+        forces = atoms.get_forces()
+        species = atoms.get_chemical_symbols()
+
+        f_mags = [float(np.linalg.norm(f)) for f in forces]
+        max_f = max(f_mags) if f_mags and max(f_mags) > 0 else 1.0
+
+        frame_vectors = []
+        for i in range(len(atoms)):
+            f_vec = forces[i]
+            f_mag = f_mags[i]
+            col = get_force_color(f_mag, max_f)
+            frame_vectors.append({
+                "origin": i,
+                "direction": [float(x) for x in f_vec],
+                "length": float(f_mag * f_scale),
+                "color": col,
+                "width": 0.06,
+            })
+
+        trajectory_frames.append({
+            "positions": positions,
+            "species": species,
+            "vectors": frame_vectors,
+            "extra_data": {
+                "Step": step + 1,
+                "Time": f"{(step + 1) * dt_fs:.1f} fs",
+                "Temperature": f"{atoms.get_temperature():.1f} K",
+                "Max Force": f"{max_f:.3f} eV/Å",
+            },
+        })
+
+    # 4. Render trajectory with structure transparency and vector controls
+    view_structure(
+        trajectory_frames,
+        structure_transparency=0.35,
+        multi_traj=True,
+        trajectory_slider=True,
+        traj_fps=18.0,
+        show_axes=True,
+        viewer_outline="1px solid #334155",
+    )
+    ```
+    """)
+    })
+
+    _atoms = Icosahedron("Au", noshells=2)
+    _atoms.set_cell([20.0, 20.0, 20.0])
+    _atoms.center()
+    _atoms.calc = EMT()
+
+    thermalize_momenta(_atoms, temperature_K=300)
+    Stationary(_atoms)
+    ZeroRotation(_atoms)
+
+    _dt_fs = 2.0
+    _dyn = VelocityVerlet(_atoms, timestep=_dt_fs * units.fs)
+
+    def _get_force_color(force_mag: float, max_force: float) -> str:
+        ratio = min(1.0, max(0.0, force_mag / max_force)) if max_force > 0 else 0.0
+        r = int(255 * ratio)
+        g = int(220 * (1.0 - abs(ratio - 0.5) * 2.0))
+        b = int(255 * (1.0 - ratio))
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    _trajectory_frames = []
+    _n_steps = 150
+    _f_scale = 0.8
+
+    for _step in range(_n_steps):
+        _dyn.run(1)
+        _pos = _atoms.get_positions().tolist()
+        _forces = _atoms.get_forces()
+        _species = _atoms.get_chemical_symbols()
+
+        _f_mags = [float(np.linalg.norm(f)) for f in _forces]
+        _max_f = max(_f_mags) if _f_mags and max(_f_mags) > 0 else 1.0
+
+        _frame_vectors = []
+        for _i in range(len(_atoms)):
+            _f_vec = _forces[_i]
+            _f_mag = _f_mags[_i]
+            _col = _get_force_color(_f_mag, _max_f)
+            _frame_vectors.append({
+                "origin": _i,
+                "direction": [float(x) for x in _f_vec],
+                "length": float(_f_mag * _f_scale),
+                "color": _col,
+                "width": 0.06,
+            })
+
+        _trajectory_frames.append({
+            "positions": _pos,
+            "species": _species,
+            "vectors": _frame_vectors,
+            "extra_data": {
+                "Step": _step + 1,
+                "Time": f"{(_step + 1) * _dt_fs:.1f} fs",
+                "Temperature": f"{_atoms.get_temperature():.1f} K",
+                "Max Force": f"{_max_f:.3f} eV/Å",
+            },
+        })
+
+    _viewer = view_structure(
+        _trajectory_frames,
+        structure_transparency=0.35,
+        multi_traj=True,
+        trajectory_slider=True,
+        traj_fps=18.0,
+        show_axes=True,
+        viewer_outline="1px solid #334155",
+    )
+
+    mo.vstack([_code, _viewer])
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
     ---
 
     ## Contributing
 
     Contributions to **marimol** are very welcome! Whether you are reporting issues, adding support for new computational chemistry packages, improving WebGL performance, or enhancing documentation, here is how to get started:
 
+    > **Branching Model**: Active development takes place on the **`dev`** branch. All new feature branches and pull requests should be based on and opened against **`dev`**. The **`main`** branch is reserved for stable releases; changes in `dev` will be merged into `main` when a new release candidate is ready.
+
     ### 1. Fork and clone the repository
 
     1. Fork the [marimol repository](https://github.com/Parzival1918/marimol) to your own GitHub account by clicking the **Fork** button on GitHub.
-    2. Clone your personal fork locally:
+    2. Clone your personal fork locally and switch to the `dev` branch:
 
     ```bash
     git clone https://github.com/<your-username>/marimol.git
     cd marimol
+    git checkout dev
     ```
 
     ### 2. Set up the development environment & pre-commit hooks
@@ -748,10 +985,28 @@ def _():
 
     ### 6. Submitting a Pull Request
 
-    1. Create a feature branch on your fork: `git checkout -b feature/my-new-feature`
-    2. Make your changes and commit them: `git commit -m "feat: add support for XYZ"`
-    3. Push to your fork: `git push origin feature/my-new-feature`
-    4. Open a Pull Request from your branch to the `main` branch of [Parzival1918/marimol](https://github.com/Parzival1918/marimol).
+    1. Make sure your local `dev` branch is up to date:
+       ```bash
+       git checkout dev
+       git pull origin dev
+       ```
+    2. Create a feature branch branching off `dev`:
+       ```bash
+       git checkout -b feature/my-new-feature
+       ```
+    3. Make your changes and commit them:
+       ```bash
+       git commit -m "feat: add support for XYZ"
+       ```
+    4. Run checks to verify code formatting and tests:
+       ```bash
+       uv run just check
+       ```
+    5. Push to your fork:
+       ```bash
+       git push origin feature/my-new-feature
+       ```
+    6. Open a Pull Request from your feature branch to the **`dev`** branch of [Parzival1918/marimol](https://github.com/Parzival1918/marimol).
 
     ---
 
