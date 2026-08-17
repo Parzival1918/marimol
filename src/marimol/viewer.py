@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 
 import anywidget
@@ -14,6 +12,7 @@ from .utils import (
     DEFAULT_VDW_RADIUS,
     VDW_RADII,
     parse_toml_config,
+    process_vectors,
     resolve_color,
 )
 
@@ -179,6 +178,11 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 shininess: 60
             });
 
+            const depthMaterial = new THREE.MeshBasicMaterial({
+                colorWrite: false,
+                depthWrite: true
+            });
+
             const outlineMaterial = new THREE.MeshBasicMaterial({
                 color: 0xffffff,
                 side: THREE.BackSide,
@@ -196,9 +200,12 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
             let atomMesh = null; // InstancedMesh for atoms
             let bondMesh = null; // InstancedMesh for bonds
+            let atomDepthMesh = null; // Depth prepass mesh for transparent atoms
+            let bondDepthMesh = null; // Depth prepass mesh for transparent bonds
             let atomOutlineMesh = null;
             let bondOutlineMesh = null;
             let cellGroup = null; // Group containing cell lines and labels
+            let vectorGroup = null; // Group containing vector arrows
             const dummy = new THREE.Object3D();
             const colorObj = new THREE.Color();
             const raycaster = new THREE.Raycaster();
@@ -1681,7 +1688,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const frames = model.get('data') || [];
                 const isTrajectory = frames.length > 1;
 
-                let positions = [], species = [], bonds = [], unitCell = [], customLabels = [], customHighlight = [], extraData = null;
+                let positions = [], species = [], bonds = [], unitCell = [], customLabels = [], customHighlight = [], extraData = null, vectors = [];
                 if (isTrajectory) {
                     uiContainer.style.display = 'flex';
                     btnPlay.style.display = model.get('multi_traj') !== false ? 'flex' : 'none';
@@ -1699,6 +1706,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     customLabels = fData.labels || [];
                     customHighlight = fData.highlight || [];
                     extraData = fData.extra_data || null;
+                    vectors = fData.vectors || [];
                 } else {
                     uiContainer.style.display = 'none';
                     const fData = frames[0] || {};
@@ -1709,6 +1717,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     customLabels = fData.labels || [];
                     customHighlight = fData.highlight || [];
                     extraData = fData.extra_data || null;
+                    vectors = fData.vectors || [];
                 }
 
                 if (extraData && Object.keys(extraData).length > 0) {
@@ -1758,7 +1767,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
 
                 // Clear old meshes
                 if (atomMesh) { scene.remove(atomMesh); atomMesh.dispose(); atomMesh = null; }
+                if (atomDepthMesh) { scene.remove(atomDepthMesh); atomDepthMesh.dispose(); atomDepthMesh = null; }
                 if (bondMesh) { scene.remove(bondMesh); bondMesh.dispose(); bondMesh = null; }
+                if (bondDepthMesh) { scene.remove(bondDepthMesh); bondDepthMesh.dispose(); bondDepthMesh = null; }
                 if (atomOutlineMesh) { scene.remove(atomOutlineMesh); atomOutlineMesh.dispose(); atomOutlineMesh = null; }
                 if (bondOutlineMesh) { scene.remove(bondOutlineMesh); bondOutlineMesh.dispose(); bondOutlineMesh = null; }
                 clearMeasurement();
@@ -1776,6 +1787,17 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         }
                     });
                     cellGroup = null;
+                }
+                if (vectorGroup) {
+                    scene.remove(vectorGroup);
+                    vectorGroup.traverse((child) => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) {
+                            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                            else child.material.dispose();
+                        }
+                    });
+                    vectorGroup = null;
                 }
 
                 // Determine styling parameters
@@ -1822,7 +1844,21 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 currentGetRadius = getRadius;
 
                 // --- ATOMS ---
+                const transparency = Math.max(0.0, Math.min(1.0, model.get('structure_transparency') || 0.0));
+                const isTransparent = transparency > 0.0;
+                sphereMaterial.transparent = isTransparent;
+                sphereMaterial.opacity = 1.0 - transparency;
+                sphereMaterial.depthWrite = !isTransparent;
+                cylinderMaterial.transparent = isTransparent;
+                cylinderMaterial.opacity = 1.0 - transparency;
+                cylinderMaterial.depthWrite = !isTransparent;
+
                 atomMesh = new THREE.InstancedMesh(sphereGeometry, sphereMaterial, numAtoms);
+                atomMesh.renderOrder = isTransparent ? 2 : 0;
+                if (isTransparent) {
+                    atomDepthMesh = new THREE.InstancedMesh(sphereGeometry, depthMaterial, numAtoms);
+                    atomDepthMesh.renderOrder = 1;
+                }
                 atomOutlineMesh = new THREE.InstancedMesh(sphereGeometry, outlineMaterial, numAtoms);
                 atomOutlineMesh.renderOrder = 1;
                 let centerSum = new THREE.Vector3(0, 0, 0);
@@ -1847,6 +1883,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     dummy.quaternion.identity();
                     dummy.updateMatrix();
                     atomMesh.setMatrixAt(i, dummy.matrix);
+                    if (isTransparent && atomDepthMesh) {
+                        atomDepthMesh.setMatrixAt(i, dummy.matrix);
+                    }
 
                     if (customHighlight && customHighlight.includes(i)) {
                         colorObj.setRGB(0, 1, 1);
@@ -1861,6 +1900,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 atomMesh.instanceMatrix.needsUpdate = true;
                 if (atomMesh.instanceColor) atomMesh.instanceColor.needsUpdate = true;
                 scene.add(atomMesh);
+                if (isTransparent && atomDepthMesh) {
+                    atomDepthMesh.instanceMatrix.needsUpdate = true;
+                    scene.add(atomDepthMesh);
+                }
 
                 updateSelectionVisuals();
                 updateInfoPanel();
@@ -1868,11 +1911,15 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 // --- BONDS ---
                 if (showBonds && bonds.length > 0) {
                     bondMesh = new THREE.InstancedMesh(cylinderGeometry, cylinderMaterial, bonds.length * 2);
+                    bondMesh.renderOrder = isTransparent ? 2 : 0;
+                    if (isTransparent) {
+                        bondDepthMesh = new THREE.InstancedMesh(cylinderGeometry, depthMaterial, bonds.length * 2);
+                        bondDepthMesh.renderOrder = 1;
+                    }
                     if (drawOutlines) {
                         bondOutlineMesh = new THREE.InstancedMesh(cylinderGeometry, bondOutlineMaterial, bonds.length);
                         bondOutlineMesh.renderOrder = 1;
                     }
-
 
                     const vA = new THREE.Vector3();
                     const vB = new THREE.Vector3();
@@ -1895,6 +1942,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         dummy.quaternion.setFromUnitVectors(yAxis, vDir);
                         dummy.updateMatrix();
                         bondMesh.setMatrixAt(i * 2, dummy.matrix);
+                        if (isTransparent && bondDepthMesh) {
+                            bondDepthMesh.setMatrixAt(i * 2, dummy.matrix);
+                        }
 
                         if (customHighlight && customHighlight.includes(b.source)) {
                             colorObj.setRGB(0, 1, 1);
@@ -1910,6 +1960,9 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         // quaternion stays the same since direction is the same
                         dummy.updateMatrix();
                         bondMesh.setMatrixAt(i * 2 + 1, dummy.matrix);
+                        if (isTransparent && bondDepthMesh) {
+                            bondDepthMesh.setMatrixAt(i * 2 + 1, dummy.matrix);
+                        }
 
                         if (customHighlight && customHighlight.includes(b.target)) {
                             colorObj.setRGB(0, 1, 1);
@@ -1933,6 +1986,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     bondMesh.instanceMatrix.needsUpdate = true;
                     if (bondMesh.instanceColor) bondMesh.instanceColor.needsUpdate = true;
                     scene.add(bondMesh);
+                    if (isTransparent && bondDepthMesh) {
+                        bondDepthMesh.instanceMatrix.needsUpdate = true;
+                        scene.add(bondDepthMesh);
+                    }
                     if (drawOutlines) {
                         bondOutlineMesh.instanceMatrix.needsUpdate = true;
                         scene.add(bondOutlineMesh);
@@ -2004,7 +2061,99 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     cellCenter = p123.clone().multiplyScalar(0.5);
                 }
 
-                if (numAtoms === 0 && !cellGroup) return;
+                // --- VECTORS / ARROWS ---
+                if (vectors && vectors.length > 0) {
+                    vectorGroup = new THREE.Group();
+                    const defaultVecWidth = model.get('vector_width') || 0.08;
+                    const defaultVecOutline = model.get('vector_outline') || false;
+                    const defaultVecColor = model.get('vector_color') || '#ff0000';
+
+                    for (let i = 0; i < vectors.length; i++) {
+                        const v = vectors[i];
+                        const origArr = v.origin || [0, 0, 0];
+                        let endArr = v.end;
+                        if (!endArr && v.direction && typeof v.length === 'number') {
+                            endArr = [
+                                origArr[0] + v.direction[0] * v.length,
+                                origArr[1] + v.direction[1] * v.length,
+                                origArr[2] + v.direction[2] * v.length
+                            ];
+                        } else if (!endArr) {
+                            endArr = origArr;
+                        }
+
+                        const vWidth = (v.width !== undefined && v.width !== null) ? v.width : ((fData.vector_width !== undefined && fData.vector_width !== null) ? fData.vector_width : defaultVecWidth);
+                        const vOutline = (v.outline !== undefined && v.outline !== null) ? v.outline : ((fData.vector_outline !== undefined && fData.vector_outline !== null) ? fData.vector_outline : defaultVecOutline);
+                        const vColor = (v.color !== undefined && v.color !== null) ? v.color : ((fData.vector_color !== undefined && fData.vector_color !== null) ? fData.vector_color : defaultVecColor);
+
+                        const vA = new THREE.Vector3().fromArray(origArr);
+                        const vB = new THREE.Vector3().fromArray(endArr);
+                        const vDir = new THREE.Vector3().subVectors(vB, vA);
+                        const length = vDir.length();
+                        if (length <= 1e-6) continue;
+
+                        vDir.normalize();
+
+                        const rShaft = vWidth;
+                        const rHead = vWidth * 2.2;
+                        const hHead = Math.min(length * 0.4, Math.max(vWidth * 3.0, 0.3));
+                        const hShaft = Math.max(0, length - hHead);
+
+                        const q = new THREE.Quaternion().setFromUnitVectors(yAxis, vDir);
+                        const vecMat = new THREE.MeshPhongMaterial({
+                            color: new THREE.Color(vColor),
+                            shininess: 60
+                        });
+
+                        if (hShaft > 0) {
+                            const shaftGeo = new THREE.CylinderGeometry(rShaft, rShaft, hShaft, 16);
+                            const shaftMesh = new THREE.Mesh(shaftGeo, vecMat);
+                            shaftMesh.quaternion.copy(q);
+                            shaftMesh.position.copy(vA).addScaledVector(vDir, hShaft / 2);
+                            vectorGroup.add(shaftMesh);
+                        }
+
+                        if (hHead > 0) {
+                            const headGeo = new THREE.ConeGeometry(rHead, hHead, 16);
+                            const headMesh = new THREE.Mesh(headGeo, vecMat);
+                            headMesh.quaternion.copy(q);
+                            headMesh.position.copy(vA).addScaledVector(vDir, hShaft + hHead / 2);
+                            vectorGroup.add(headMesh);
+                        }
+
+                        if (vOutline) {
+                            const outColor = (typeof vOutline === 'string' && vOutline.length > 0) ? new THREE.Color(vOutline) : defaultOutlineColor;
+                            const outMat = new THREE.MeshBasicMaterial({
+                                color: outColor,
+                                side: THREE.BackSide,
+                                depthWrite: true
+                            });
+                            const outThick = Math.max(0.02, vWidth * 0.25);
+
+                            if (hShaft > 0) {
+                                const shaftOutGeo = new THREE.CylinderGeometry(rShaft + outThick, rShaft + outThick, hShaft, 16);
+                                const shaftOutMesh = new THREE.Mesh(shaftOutGeo, outMat);
+                                shaftOutMesh.quaternion.copy(q);
+                                shaftOutMesh.position.copy(vA).addScaledVector(vDir, hShaft / 2);
+                                shaftOutMesh.renderOrder = 1;
+                                vectorGroup.add(shaftOutMesh);
+                            }
+
+                            if (hHead > 0) {
+                                const headOutGeo = new THREE.ConeGeometry(rHead + outThick, hHead + outThick, 16);
+                                const headOutMesh = new THREE.Mesh(headOutGeo, outMat);
+                                headOutMesh.quaternion.copy(q);
+                                headOutMesh.position.copy(vA).addScaledVector(vDir, hShaft + hHead / 2);
+                                headOutMesh.renderOrder = 1;
+                                vectorGroup.add(headOutMesh);
+                            }
+                        }
+                    }
+
+                    scene.add(vectorGroup);
+                }
+
+                if (numAtoms === 0 && !cellGroup && (!vectors || vectors.length === 0)) return;
 
                 // Auto-center and fit camera
                 const sceneCenter = new THREE.Vector3();
@@ -2013,6 +2162,14 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 } else if (numAtoms > 0) {
                     centerSum.divideScalar(numAtoms);
                     sceneCenter.copy(centerSum);
+                } else if (vectors && vectors.length > 0) {
+                    let vSum = new THREE.Vector3();
+                    let vCount = 0;
+                    for (let i = 0; i < vectors.length; i++) {
+                        if (vectors[i].origin) { vSum.add(new THREE.Vector3().fromArray(vectors[i].origin)); vCount++; }
+                        if (vectors[i].end) { vSum.add(new THREE.Vector3().fromArray(vectors[i].end)); vCount++; }
+                    }
+                    if (vCount > 0) sceneCenter.copy(vSum.divideScalar(vCount));
                 }
 
                 if (!isCameraInitialized || forceFitCamera === true) {
@@ -2027,6 +2184,21 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                             const pos = new THREE.Vector3().fromArray(positions[i] || [0,0,0]);
                             const dist = pos.distanceTo(sceneCenter);
                             if (dist > maxDist) maxDist = dist;
+                        }
+                    }
+                    if (vectors && vectors.length > 0) {
+                        for (let i = 0; i < vectors.length; i++) {
+                            const v = vectors[i];
+                            if (v.origin) {
+                                const vOrig = new THREE.Vector3().fromArray(v.origin);
+                                const distO = vOrig.distanceTo(sceneCenter);
+                                if (distO > maxDist) maxDist = distO;
+                            }
+                            if (v.end) {
+                                const vEnd = new THREE.Vector3().fromArray(v.end);
+                                const distE = vEnd.distanceTo(sceneCenter);
+                                if (distE > maxDist) maxDist = distE;
+                            }
                         }
                     }
 
@@ -2107,6 +2279,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 }
                 if (isHelpOpen) updateHelpContent();
             });
+            model.on("change:vector_width", () => updateScene(false));
+            model.on("change:vector_outline", () => updateScene(false));
+            model.on("change:vector_color", () => updateScene(false));
+            model.on("change:structure_transparency", () => updateScene(false));
             model.on("change:multi_traj", () => {
                 const showPlay = model.get('multi_traj') !== false;
                 btnPlay.style.display = showPlay ? 'flex' : 'none';
@@ -2471,18 +2647,43 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (atomMesh) {
                     atomMesh.dispose();
                     scene.remove(atomMesh);
+                    atomMesh = null;
+                }
+                if (atomDepthMesh) {
+                    atomDepthMesh.dispose();
+                    scene.remove(atomDepthMesh);
+                    atomDepthMesh = null;
                 }
                 if (atomOutlineMesh) {
                     atomOutlineMesh.dispose();
                     scene.remove(atomOutlineMesh);
+                    atomOutlineMesh = null;
                 }
                 if (bondMesh) {
                     bondMesh.dispose();
                     scene.remove(bondMesh);
+                    bondMesh = null;
+                }
+                if (bondDepthMesh) {
+                    bondDepthMesh.dispose();
+                    scene.remove(bondDepthMesh);
+                    bondDepthMesh = null;
                 }
                 if (bondOutlineMesh) {
                     bondOutlineMesh.dispose();
                     scene.remove(bondOutlineMesh);
+                    bondOutlineMesh = null;
+                }
+                if (vectorGroup) {
+                    scene.remove(vectorGroup);
+                    vectorGroup.traverse((child) => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) {
+                            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                            else child.material.dispose();
+                        }
+                    });
+                    vectorGroup = null;
                 }
                 renderer.dispose();
             };
@@ -2509,6 +2710,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     draw_outlines = traitlets.Bool(False).tag(sync=True)
     draw_labels = traitlets.Bool(False).tag(sync=True)
     measuring_tool = traitlets.Bool(False).tag(sync=True)
+    vector_width = traitlets.Float(0.08).tag(sync=True)
+    vector_outline = traitlets.Any(default_value=False).tag(sync=True)
+    vector_color = traitlets.Unicode("red").tag(sync=True)
+    structure_transparency = traitlets.Float(0.0).tag(sync=True)
     spin = traitlets.Bool(False).tag(sync=True)
     spin_axis = traitlets.List(default_value=[0.0, 1.0, 0.0]).tag(sync=True)
     spin_speed = traitlets.Float(2.0).tag(sync=True)
@@ -2565,6 +2770,10 @@ DEFAULT_VIEWER_CONFIG = {
     "draw_labels": False,
     "measuring_tool": False,
     "unwrap_molecules": False,
+    "vector_width": 0.08,
+    "vector_outline": False,
+    "vector_color": "red",
+    "structure_transparency": 0.0,
     "spin": False,
     "spin_axis": (0.0, 1.0, 0.0),
     "spin_speed": 2.0,
@@ -2578,6 +2787,49 @@ DEFAULT_VIEWER_CONFIG = {
     "record_include_bgd": False,
     "record_include_ui": False,
 }
+
+
+def _prepare_frames_data(
+    frames_data: list[dict],
+    compute_extra_data: bool,
+    unwrap_molecules: bool,
+    bond_radius: float,
+    vector_width: float,
+    vector_outline: bool | str,
+    resolved_vector_color: str,
+) -> list[dict]:
+    """Preprocess frame dictionaries for physical properties, unwrapping, bonds, and vectors."""
+    if compute_extra_data:
+        from .utils import compute_extra_data as compute_extra_data_func
+
+        for f in frames_data:
+            compute_extra_data_func(f)
+
+    if unwrap_molecules:
+        from .utils import unwrap_molecules as unwrap_molecules_func
+
+        frames_data = [unwrap_molecules_func(f) for f in frames_data]
+
+    if bond_radius > 0:
+        from .utils import compute_bonds
+
+        for f in frames_data:
+            if not f.get("bonds"):
+                f["bonds"] = compute_bonds(f, use_pbc=True)
+
+    processed_frames = []
+    for f in frames_data:
+        f_dict = dict(f)
+        if "vectors" in f and f["vectors"]:
+            f_dict["vectors"] = process_vectors(
+                f,
+                default_width=vector_width,
+                default_outline=vector_outline,
+                default_color=resolved_vector_color,
+            )
+        processed_frames.append(f_dict)
+
+    return processed_frames
 
 
 def view_structure(
@@ -2597,6 +2849,10 @@ def view_structure(
     draw_labels: bool = _UNSET,
     measuring_tool: bool = _UNSET,
     unwrap_molecules: bool = _UNSET,
+    structure_transparency: float = _UNSET,
+    vector_width: float = _UNSET,
+    vector_outline: bool | str = _UNSET,
+    vector_color: str = _UNSET,
     spin: bool = _UNSET,
     spin_axis: tuple[float, float, float] | list[float] = _UNSET,
     spin_speed: float = _UNSET,
@@ -2617,8 +2873,8 @@ def view_structure(
     ----------
     data : dict or list[dict]
         A dictionary with keys 'positions', 'species', 'bonds' (optional), 'unit_cell' (optional),
-        'labels' (optional), 'highlight' (optional), 'extra_data' (optional) or a list of such dictionaries
-        for a trajectory.
+        'labels' (optional), 'highlight' (optional), 'extra_data' (optional), 'vectors' (optional)
+        or a list of such dictionaries for a trajectory.
     config : dict, str, or os.PathLike, optional
         A dictionary, path to a TOML file (PathLike or str), or a TOML formatted string containing configuration
         settings. Default is None. Any explicitly provided arguments to view_structure will override the settings in config.
@@ -2654,6 +2910,15 @@ def view_structure(
         Whether to enable measuring tool. Default is False.
     unwrap_molecules : bool, optional
         Whether to unwrap molecules split across periodic boundaries. Default is False.
+    structure_transparency : float, optional
+        Transparency level for atoms and bonds between 0.0 (completely opaque, default) and 1.0 (fully transparent).
+        Useful for viewing internal vectors or cross-sections. *(added in v0.3.0)*
+    vector_width : float, optional
+        Shaft radius / width for 3D vector arrows. Default is 0.08. *(added in v0.3.0)*
+    vector_outline : bool or str, optional
+        Whether to draw outlines around 3D vector arrows (or outline color string). Default is False. *(added in v0.3.0)*
+    vector_color : str, optional
+        Default color name or hex code for 3D vector arrows. Default is "red". *(added in v0.3.0)*
     spin : bool, optional
         Whether to spin the structure. Default is False.
     spin_axis : tuple[float, float, float] or list[float], optional
@@ -2709,6 +2974,10 @@ def view_structure(
     draw_labels = _resolve(draw_labels, "draw_labels")
     measuring_tool = _resolve(measuring_tool, "measuring_tool")
     unwrap_molecules = _resolve(unwrap_molecules, "unwrap_molecules")
+    structure_transparency = _resolve(structure_transparency, "structure_transparency")
+    vector_width = _resolve(vector_width, "vector_width")
+    vector_outline = _resolve(vector_outline, "vector_outline")
+    vector_color = _resolve(vector_color, "vector_color")
     spin = _resolve(spin, "spin")
     spin_axis = _resolve(spin_axis, "spin_axis")
     spin_speed = _resolve(spin_speed, "spin_speed")
@@ -2724,30 +2993,24 @@ def view_structure(
 
     resolved_style = STYLES.get(style, STYLES["vdw"]) if isinstance(style, str) else style
     resolved_bg = resolve_color(background_color)
+    resolved_vector_color = resolve_color(vector_color)
 
     is_trajectory = isinstance(data, list)
     frames_data = data if is_trajectory else [data]
 
-    if compute_extra_data:
-        from .utils import compute_extra_data as compute_extra_data_func
-
-        for f in frames_data:
-            compute_extra_data_func(f)
-
-    if unwrap_molecules:
-        from .utils import unwrap_molecules as unwrap_molecules_func
-
-        frames_data = [unwrap_molecules_func(f) for f in frames_data]
-
     use_vdw = resolved_style.get("use_vdw_radii", False)
     bond_radius = resolved_style.get("bond_radius", 0.0)
 
-    if bond_radius > 0:
-        from .utils import compute_bonds
+    frames_data = _prepare_frames_data(
+        frames_data=frames_data,
+        compute_extra_data=compute_extra_data,
+        unwrap_molecules=unwrap_molecules,
+        bond_radius=bond_radius,
+        vector_width=vector_width,
+        vector_outline=vector_outline,
+        resolved_vector_color=resolved_vector_color,
+    )
 
-        for f in frames_data:
-            if not f.get("bonds"):
-                f["bonds"] = compute_bonds(f, use_pbc=True)
     sel_radius_map = VDW_RADII if use_vdw else ATOMIC_RADII
     sel_default_radius = DEFAULT_VDW_RADIUS if use_vdw else DEFAULT_RADIUS
 
@@ -2770,6 +3033,10 @@ def view_structure(
         draw_outlines=draw_outlines,
         draw_labels=draw_labels,
         measuring_tool=measuring_tool,
+        structure_transparency=structure_transparency,
+        vector_width=vector_width,
+        vector_outline=vector_outline,
+        vector_color=resolved_vector_color,
         spin=spin,
         spin_axis=list(spin_axis),
         spin_speed=spin_speed,

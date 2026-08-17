@@ -96,6 +96,10 @@ data = {
     "positions": [[0.0, 0.0, 0.0], [1.1, 0.0, 0.0]],
     "species": ["C", "O"],
     "bonds": [{"source": 0, "target": 1}],
+    # Optional 3D vector arrows (origin, end/direction, length, styling) *(added in v0.3.0)*
+    "vectors": [
+        {"origin": 0, "direction": [0.0, 0.0, 1.0], "length": 1.5, "color": "yellow", "outline": True},
+    ],
 }
 
 view_structure(data)
@@ -169,6 +173,10 @@ All viewer functions (`view_structure`, `view_ase`, `view_pymatgen`, `view_cspy`
 | `draw_labels` | `bool` | `False` | Element and index labels on atoms with 3D occlusion testing. |
 | `measuring_tool` | `bool` | `False` | Enable ruler button in the top-right toolbar for distance and angle measurements. |
 | `unwrap_molecules` | `bool` | `False` | Unwrap molecules split across periodic unit cell boundary conditions. |
+| `structure_transparency` | `float` | `0.0` | Transparency level for atoms and bonds ($0.0$ opaque to $1.0$ fully transparent), useful for viewing internal vectors. *(added in v0.3.0)* |
+| `vector_width` | `float` | `0.08` | Shaft radius / width for 3D vector arrows. *(added in v0.3.0)* |
+| `vector_outline` | `bool` \| `str` | `False` | Whether to draw outlines around 3D vector arrows (or outline color string). *(added in v0.3.0)* |
+| `vector_color` | `str` | `"red"` | Default color name or hex code for 3D vector arrows. *(added in v0.3.0)* |
 | `spin` | `bool` | `False` | Continuous automatic 3D rotation of the structure. |
 | `spin_axis` | `tuple[float, float, float]` | `(0.0, 1.0, 0.0)` | Cartesian 3D axis vector around which the structure rotates during spin. |
 | `spin_speed` | `float` | `2.0` | Angular rotation speed for auto-spin (positive for CW, negative for CCW). |
@@ -244,6 +252,7 @@ uv run marimo edit examples/01_interactive_molecule_viewer.py
 | [`03_crystal_structures_and_extra_data.py`](examples/03_crystal_structures_and_extra_data.py) | Periodic crystal lattices with unit cell wireframes, depth fog, and automated crystallographic metrics. |
 | [`04_toml_presets_and_themes.py`](examples/04_toml_presets_and_themes.py) | Reusable visual presets loaded from TOML via `config` with parameter overrides. *(added in v0.2.0)* |
 | [`05_cspy_crystal_generation_and_custom_extra_data.py`](examples/05_cspy_crystal_generation_and_custom_extra_data.py) | Crystal structure generation across space groups with custom `extra_data` callable. *(added in v0.3.0)* |
+| [`06_vector_data_and_arrows.py`](examples/06_vector_data_and_arrows.py) | 3D vector arrows for molecular dipole moments, vibrational forces, magnetic spins, and transparency. *(added in v0.3.0)* |
 
 ---
 

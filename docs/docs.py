@@ -6,7 +6,12 @@ app = marimo.App()
 with app.setup:
     import marimo as mo
     import numpy as np
+    from ase import units
     from ase.build import bulk, molecule
+    from ase.calculators.emt import EMT
+    from ase.cluster import Icosahedron
+    from ase.md.velocitydistribution import Stationary, ZeroRotation, thermalize_momenta
+    from ase.md.verlet import VelocityVerlet
     from cspy import Molecule
     from cspy.crystal.generate_crystal import CrystalGenerator
     from marimol import parse_toml_config, view_ase, view_cspy, view_pymatgen, view_structure
@@ -146,6 +151,10 @@ def _():
     | `draw_labels` | `bool` | `False` | Displays element/index labels on top of atoms with 3D occlusion testing. |
     | `measuring_tool` | `bool` | `False` | Enables the ruler button in the top-right overlay for distance, angle, and dihedral measurements. |
     | `unwrap_molecules` | `bool` | `False` | Unwraps molecules split across periodic unit cell boundary conditions and centers whole molecules inside the cell. |
+    | `structure_transparency` | `float` | `0.0` | Transparency level for atoms and bonds between 0.0 (completely opaque) and 1.0 (fully transparent), useful for viewing internal vectors. *(added in v0.3.0)* |
+    | `vector_width` | `float` | `0.08` | Shaft radius / width for 3D vector arrows. *(added in v0.3.0)* |
+    | `vector_outline` | `bool` \| `str` | `False` | Whether to draw outlines around 3D vector arrows (or outline color string). *(added in v0.3.0)* |
+    | `vector_color` | `str` | `"red"` | Default color name or hex code for 3D vector arrows. *(added in v0.3.0)* |
     | `spin` | `bool` | `False` | Enables continuous automatic 3D rotation of the structure. |
     | `spin_axis` | `tuple[float, float, float]` | `(0.0, 1.0, 0.0)` | Cartesian 3D axis vector around which the structure rotates during auto-spin. |
     | `spin_speed` | `float` | `2.0` | Angular rotation speed for auto-spin (positive for clockwise, negative for counter-clockwise). |
@@ -220,6 +229,19 @@ def _():
             "energy": -40.512,
             "point_group": "Td",
         },
+
+        # [Optional] 3D vector arrows (e.g. dipole moments, forces, spins) *(added in v0.3.0)*
+        "vectors": [
+            # Arrow starting at atom 0 pointing in a given direction with explicit length
+            {"origin": 0, "direction": [0.0, 0.0, 1.0], "length": 1.5, "color": "yellow", "width": 0.10, "outline": True},
+            # Arrow between two Cartesian coordinate positions or atom indices
+            {"origin": [0.0, 0.0, 0.0], "end": [1.0, 1.0, 0.0], "color": "cyan"},
+        ],
+
+        # [Optional] Frame-level vector defaults *(added in v0.3.0)*
+        "vector_width": 0.08,
+        "vector_outline": False,
+        "vector_color": "red",
     }
     ```
 
@@ -690,6 +712,192 @@ def _():
     """
 
     _viewer = view_ase(_ethanol, config=_toml_config)
+
+    mo.vstack([_code, _viewer])
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ### 7. 3D Vector & Arrow Visualization
+
+    **marimol** allows rendering 3D vector arrows *(added in v0.3.0)* to visualize vector quantities such as molecular dipole moments, atomic forces, vibrational normal modes, magnetic spin vectors, and interatomic displacement vectors.
+
+    #### Specifying Vectors
+
+    Add an optional `"vectors"` entry to your structure dictionary containing a list of vector dictionaries:
+
+    - **`origin`**: Starting point of the arrow. Can be passed as an **atom index** (integer $\ge 0$) or as **3D Cartesian coordinates** (`[x, y, z]`).
+    - **`end`**: Destination point of the arrow. Can be passed as an **atom index** or **3D Cartesian coordinates**.
+    - **`direction` & `length`**: Alternative to `end`. Pass `direction` as a 3D vector (`[dx, dy, dz]`) and optionally `length` as a float. If `length` is omitted, the Euclidean norm of `direction` is used.
+
+    #### Styling & Precedence Hierarchy
+
+    Vector appearance can be configured at three levels (highest to lowest precedence):
+
+    1. **Per-vector keys** in the vector dictionary: `width`, `outline`, `color`.
+    2. **Per-frame keys** in the data dictionary: `vector_width`, `vector_outline`, `vector_color`.
+    3. **Global arguments** in `view_structure` / config: `vector_width` (default `0.08`), `vector_outline` (default `False`), `vector_color` (default `"red"`).
+
+    The example below visualizes a live **Molecular Dynamics (MD)** trajectory of a **Gold Nanoparticle ($\text{Au}_{13}$)** with instantaneous **atomic force vectors** color-coded by magnitude, rendered with structure transparency (`structure_transparency=0.35`):
+    """)
+    return
+
+
+@app.cell
+def _():
+    _code = mo.accordion({
+        "View Code": mo.md(r"""
+    ```python
+    import numpy as np
+    from ase import units
+    from ase.calculators.emt import EMT
+    from ase.cluster import Icosahedron
+    from ase.md.velocitydistribution import Stationary, ZeroRotation, thermalize_momenta
+    from ase.md.verlet import VelocityVerlet
+    from marimol import view_structure
+
+    # 1. Construct Au13 icosahedral gold nanoparticle
+    atoms = Icosahedron("Au", noshells=2)
+    atoms.set_cell([20.0, 20.0, 20.0])
+    atoms.center()
+    atoms.calc = EMT()
+
+    # 2. Thermalize and set up molecular dynamics (2 fs timestep)
+    thermalize_momenta(atoms, temperature_K=300)
+    Stationary(atoms)
+    ZeroRotation(atoms)
+
+    dt_fs = 2.0
+    dyn = VelocityVerlet(atoms, timestep=dt_fs * units.fs)
+
+    def get_force_color(force_mag: float, max_force: float) -> str:
+        ratio = min(1.0, max(0.0, force_mag / max_force)) if max_force > 0 else 0.0
+        r = int(255 * ratio)
+        g = int(220 * (1.0 - abs(ratio - 0.5) * 2.0))
+        b = int(255 * (1.0 - ratio))
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    # 3. Run 150 steps of MD and collect atomic force vectors
+    trajectory_frames = []
+    n_steps = 150
+    f_scale = 0.8
+
+    for step in range(n_steps):
+        dyn.run(1)
+        positions = atoms.get_positions().tolist()
+        forces = atoms.get_forces()
+        species = atoms.get_chemical_symbols()
+
+        f_mags = [float(np.linalg.norm(f)) for f in forces]
+        max_f = max(f_mags) if f_mags and max(f_mags) > 0 else 1.0
+
+        frame_vectors = []
+        for i in range(len(atoms)):
+            f_vec = forces[i]
+            f_mag = f_mags[i]
+            col = get_force_color(f_mag, max_f)
+            frame_vectors.append({
+                "origin": i,
+                "direction": [float(x) for x in f_vec],
+                "length": float(f_mag * f_scale),
+                "color": col,
+                "width": 0.06,
+            })
+
+        trajectory_frames.append({
+            "positions": positions,
+            "species": species,
+            "vectors": frame_vectors,
+            "extra_data": {
+                "Step": step + 1,
+                "Time": f"{(step + 1) * dt_fs:.1f} fs",
+                "Temperature": f"{atoms.get_temperature():.1f} K",
+                "Max Force": f"{max_f:.3f} eV/Å",
+            },
+        })
+
+    # 4. Render trajectory with structure transparency and vector controls
+    view_structure(
+        trajectory_frames,
+        structure_transparency=0.35,
+        multi_traj=True,
+        trajectory_slider=True,
+        traj_fps=18.0,
+        show_axes=True,
+        viewer_outline="1px solid #334155",
+    )
+    ```
+    """)
+    })
+
+    _atoms = Icosahedron("Au", noshells=2)
+    _atoms.set_cell([20.0, 20.0, 20.0])
+    _atoms.center()
+    _atoms.calc = EMT()
+
+    thermalize_momenta(_atoms, temperature_K=300)
+    Stationary(_atoms)
+    ZeroRotation(_atoms)
+
+    _dt_fs = 2.0
+    _dyn = VelocityVerlet(_atoms, timestep=_dt_fs * units.fs)
+
+    def _get_force_color(force_mag: float, max_force: float) -> str:
+        ratio = min(1.0, max(0.0, force_mag / max_force)) if max_force > 0 else 0.0
+        r = int(255 * ratio)
+        g = int(220 * (1.0 - abs(ratio - 0.5) * 2.0))
+        b = int(255 * (1.0 - ratio))
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    _trajectory_frames = []
+    _n_steps = 150
+    _f_scale = 0.8
+
+    for _step in range(_n_steps):
+        _dyn.run(1)
+        _pos = _atoms.get_positions().tolist()
+        _forces = _atoms.get_forces()
+        _species = _atoms.get_chemical_symbols()
+
+        _f_mags = [float(np.linalg.norm(f)) for f in _forces]
+        _max_f = max(_f_mags) if _f_mags and max(_f_mags) > 0 else 1.0
+
+        _frame_vectors = []
+        for _i in range(len(_atoms)):
+            _f_vec = _forces[_i]
+            _f_mag = _f_mags[_i]
+            _col = _get_force_color(_f_mag, _max_f)
+            _frame_vectors.append({
+                "origin": _i,
+                "direction": [float(x) for x in _f_vec],
+                "length": float(_f_mag * _f_scale),
+                "color": _col,
+                "width": 0.06,
+            })
+
+        _trajectory_frames.append({
+            "positions": _pos,
+            "species": _species,
+            "vectors": _frame_vectors,
+            "extra_data": {
+                "Step": _step + 1,
+                "Time": f"{(_step + 1) * _dt_fs:.1f} fs",
+                "Temperature": f"{_atoms.get_temperature():.1f} K",
+                "Max Force": f"{_max_f:.3f} eV/Å",
+            },
+        })
+
+    _viewer = view_structure(
+        _trajectory_frames,
+        structure_transparency=0.35,
+        multi_traj=True,
+        trajectory_slider=True,
+        traj_fps=18.0,
+        show_axes=True,
+        viewer_outline="1px solid #334155",
+    )
 
     mo.vstack([_code, _viewer])
     return
