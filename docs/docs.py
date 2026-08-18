@@ -151,7 +151,7 @@ def _():
     | `draw_outlines` | `bool` | `False` | Draws stylized cartoon / cel-shaded silhouette outlines around atoms and bonds. |
     | `draw_labels` | `bool` | `False` | Displays element/index labels on top of atoms with 3D occlusion testing. |
     | `measuring_tool` | `bool` | `False` | Enables the ruler button in the top-right overlay for distance, angle, and dihedral measurements. |
-    | `unwrap_molecules` | `bool` | `False` | Unwraps molecules split across periodic unit cell boundary conditions and centers whole molecules inside the cell. Since *v0.4.0*, by setting this to `False`, the bond computation is also forced to be done without periodic conditions. |
+    | `unwrap_molecules` | `bool` | `False` | Unwraps molecules split across periodic unit cell boundary conditions and centers whole molecules inside the cell. Since *v0.3.1*, by setting this to `False`, the bond computation is also forced to be done without periodic conditions. |
     | `structure_transparency` | `float` | `0.0` | Transparency level for atoms and bonds between 0.0 (completely opaque) and 1.0 (fully transparent), useful for viewing internal vectors. *(added in v0.3.0)* |
     | `vector_width` | `float` | `0.08` | Shaft radius / width for 3D vector arrows. *(added in v0.3.0)* |
     | `vector_outline` | `bool` \| `str` | `False` | Whether to draw outlines around 3D vector arrows (or outline color string). *(added in v0.3.0)* |

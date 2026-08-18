@@ -38,13 +38,6 @@ def _convert_ase_atoms(atoms: ase.Atoms, extra_data_func: Callable[[ase.Atoms], 
         cell = None
 
     extra_data = {}
-    if hasattr(atoms, "info") and atoms.info:
-        extra_data.update(atoms.info)
-    if hasattr(atoms, "calc") and atoms.calc is not None and hasattr(atoms.calc, "results") and atoms.calc.results:
-        for k, v in atoms.calc.results.items():
-            if k not in extra_data:
-                extra_data[k] = v
-
     if extra_data_func is not None:
         custom_data = extra_data_func(atoms)
         if not isinstance(custom_data, dict):
@@ -69,9 +62,7 @@ def view_ase(
     **kwargs,
 ) -> mo.ui.anywidget:
     """
-    Visualize ASE Atoms or list of Atoms objects. Data stored in the `info` attribute
-    and `calc.results` attribute are automatically added to the `extra_data` attribute
-    of the data dictionary.
+    Visualize ASE Atoms or list of Atoms objects.
 
     Parameters
     ----------
