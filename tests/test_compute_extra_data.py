@@ -304,6 +304,22 @@ def test_view_ase_custom_extra_data_with_compute_extra_data():
     assert "density" in frame["extra_data"]
 
 
+def test_view_ase_does_not_auto_include_info_or_calc():
+    from ase import Atoms
+    from ase.calculators.singlepoint import SinglePointCalculator
+
+    from marimol import view_ase
+
+    atoms = Atoms("H2O", positions=[[0, 0, 0], [0, 0, 1], [0, 1, 0]])
+    atoms.info["energy"] = -10.5
+    calc = SinglePointCalculator(atoms, energy=-10.5, forces=[[0, 0, 0], [0, 0, 0], [0, 0, 0]])
+    atoms.calc = calc
+
+    widget = view_ase(atoms)
+    frame = widget.widget.data[0]
+    assert "extra_data" not in frame
+
+
 def test_view_pymatgen_custom_extra_data():
     from pymatgen.core import Lattice, Structure
 
