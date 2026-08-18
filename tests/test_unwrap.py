@@ -51,6 +51,9 @@ def test_unwrap_split_molecule():
         "species": ["H", "H"],
         "unit_cell": [[10.0, 0.0, 0.0], [0.0, 10.0, 0.0], [0.0, 0.0, 10.0]],
     }
+    bonds_no_pbc = compute_bonds(data, use_pbc=False)
+    assert len(bonds_no_pbc) == 0
+
     bonds = compute_bonds(data, use_pbc=True)
     assert len(bonds) == 1
 
@@ -59,3 +62,47 @@ def test_unwrap_split_molecule():
     # The bond distance in Cartesian space should now be 0.2 Å
     d = np.linalg.norm(pos[0] - pos[1])
     assert np.isclose(d, 0.2, atol=1e-4)
+
+
+def test_view_structure_unwrap_molecules_false_vs_true():
+    from marimol import view_structure
+
+    data = {
+        "positions": [[0.1, 0.1, 0.1], [9.9, 0.1, 0.1]],
+        "species": ["H", "H"],
+        "unit_cell": [[10.0, 0.0, 0.0], [0.0, 10.0, 0.0], [0.0, 0.0, 10.0]],
+    }
+
+    # When unwrap_molecules=False, no PBC bonds should be computed across the cell
+    widget_false = view_structure(data, unwrap_molecules=False)
+    assert widget_false.widget.data[0]["bonds"] == []
+
+    # When unwrap_molecules=True, molecules are unwrapped and bonds are computed
+    widget_true = view_structure(data, unwrap_molecules=True)
+    assert len(widget_true.widget.data[0]["bonds"]) == 1
+    assert widget_true.widget.data[0]["bonds"][0] == {"source": 0, "target": 1}
+
+
+def test_view_ase_unwrap_molecules_false_vs_true():
+    from ase import Atoms
+
+    from marimol import view_ase
+
+    atoms = Atoms(
+        symbols=["H", "H"],
+        positions=[[0.1, 0.1, 0.1], [9.9, 0.1, 0.1]],
+        cell=[[10.0, 0.0, 0.0], [0.0, 10.0, 0.0], [0.0, 0.0, 10.0]],
+        pbc=True,
+    )
+
+    # When unwrap_molecules=False (default), bonds across PBC must not be computed
+    widget_default = view_ase(atoms)
+    assert widget_default.widget.data[0]["bonds"] == []
+
+    widget_false = view_ase(atoms, unwrap_molecules=False)
+    assert widget_false.widget.data[0]["bonds"] == []
+
+    # When unwrap_molecules=True, bonds are computed and atoms are unwrapped
+    widget_true = view_ase(atoms, unwrap_molecules=True)
+    assert len(widget_true.widget.data[0]["bonds"]) == 1
+    assert widget_true.widget.data[0]["bonds"][0] == {"source": 0, "target": 1}
