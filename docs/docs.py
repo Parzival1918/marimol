@@ -10,11 +10,12 @@ with app.setup:
     from ase.build import bulk, molecule
     from ase.calculators.emt import EMT
     from ase.cluster import Icosahedron
+    from ase.io import read
     from ase.md.velocitydistribution import Stationary, ZeroRotation, thermalize_momenta
     from ase.md.verlet import VelocityVerlet
     from cspy import Molecule
     from cspy.crystal.generate_crystal import CrystalGenerator
-    from marimol import parse_toml_config, view_ase, view_cspy, view_pymatgen, view_structure
+    from marimol import view_ase, view_cspy, view_pymatgen, view_structure
     from pymatgen.core import Lattice, Structure
 
 
@@ -150,7 +151,7 @@ def _():
     | `draw_outlines` | `bool` | `False` | Draws stylized cartoon / cel-shaded silhouette outlines around atoms and bonds. |
     | `draw_labels` | `bool` | `False` | Displays element/index labels on top of atoms with 3D occlusion testing. |
     | `measuring_tool` | `bool` | `False` | Enables the ruler button in the top-right overlay for distance, angle, and dihedral measurements. |
-    | `unwrap_molecules` | `bool` | `False` | Unwraps molecules split across periodic unit cell boundary conditions and centers whole molecules inside the cell. |
+    | `unwrap_molecules` | `bool` | `False` | Unwraps molecules split across periodic unit cell boundary conditions and centers whole molecules inside the cell. Since *v0.4.0*, by setting this to `False`, the bond computation is also forced to be done without periodic conditions. |
     | `structure_transparency` | `float` | `0.0` | Transparency level for atoms and bonds between 0.0 (completely opaque) and 1.0 (fully transparent), useful for viewing internal vectors. *(added in v0.3.0)* |
     | `vector_width` | `float` | `0.08` | Shaft radius / width for 3D vector arrows. *(added in v0.3.0)* |
     | `vector_outline` | `bool` \| `str` | `False` | Whether to draw outlines around 3D vector arrows (or outline color string). *(added in v0.3.0)* |
@@ -465,7 +466,96 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### 4. Pymatgen Integration: Perovskite $\text{SrTiO}_3$ in Van der Waals Style with Depth Fog
+    ### 4. Unwrapping Molecules across Periodic Boundaries
+
+    Sometimes the crystal data we have has all the atomic positions in the `[0,1)` fractional coordinates range, and in the case of molecular crystals this can result in molecules being split across periodic boundary conditions, which might not always be the desired behaviour. To fix this, **marimol** provides the `unwarp_molecules` argument:
+
+    - **`unwrap_molecules=False` (default)**: Atoms remain at their original coordinate positions inside the cell. Bonds across periodic boundaries are omitted.
+    - **`unwrap_molecules=True`**: Molecular connectivity across periodic boundary conditions is analyzed to reconstruct intact, unbroken molecules with their centroids centered inside the unit cell.
+
+    The example below loads two polymorphs of **ROY**: **Y** and **YT04**. Use the `< 1/2 >` frame buttons to switch between the two polymorphs.
+    """)
+    return
+
+
+@app.cell
+def _():
+    _code = mo.accordion({
+        "View Code": mo.md(r"""
+    ```python
+    from ase.io import read
+    from marimol import view_ase
+
+    # Load two polymorphs of ROY: Y and YT04
+    roy_y = read("./docs/roy_y.cif")
+    roy_yt04 = read("./docs/roy_yt04.cif")
+    crystals = [roy_y, roy_yt04]
+
+    # 1. Folded into unit cell bounds (unwrap_molecules=False)
+    # Fragmented molecules remain split across cell boundaries without stretching bonds
+    viewer_folded = view_ase(
+        crystals,
+        unwrap_molecules=False,
+        multi_traj=False,
+        show_axes=True,
+        viewer_outline=True,
+    )
+
+    # 2. Reconstructed whole molecules (unwrap_molecules=True)
+    # Molecules are unwrapped across periodic boundaries into intact units
+    viewer_unwrapped = view_ase(
+        crystals,
+        unwrap_molecules=True,
+        multi_traj=False,
+        show_axes=True,
+        viewer_outline=True,
+    )
+    ```
+    """)
+    })
+
+    _c1 = read("./docs/roy_y.cif")
+    _c2 = read("./docs/roy_yt04.cif")
+    _crystals = [_c1, _c2]
+
+    _viewer_folded = view_ase(
+        _crystals,
+        unwrap_molecules=False,
+        multi_traj=False,
+        show_axes=True,
+        viewer_outline=True,
+    )
+    _viewer_unwrapped = view_ase(
+        _crystals,
+        unwrap_molecules=True,
+        multi_traj=False,
+        show_axes=True,
+        viewer_outline=True,
+    )
+
+    _comparison = mo.hstack(
+        [
+            mo.vstack([
+                mo.md("`unwrap_molecules=False` (Folded)"),
+                _viewer_folded,
+            ]),
+            mo.vstack([
+                mo.md("`unwrap_molecules=True` (Unwrapped)"),
+                _viewer_unwrapped,
+            ]),
+        ],
+        widths="equal",
+        gap=1.5,
+    )
+
+    mo.vstack([_code, _comparison])
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ### 5. Pymatgen Integration: Perovskite $\text{SrTiO}_3$ in Van der Waals Style with Depth Fog
 
     Visualizing a Strontium Titanate ($\text{SrTiO}_3$) perovskite crystal created with **Pymatgen** (`pymatgen.core.Structure`), rendered in space-filling Van der Waals sphere style (`style="vdw"`), perspective projection (`projection="perspective"`), and atmospheric depth fog (`fog=True`, `fog_strength=0.6`).
     """)
@@ -525,7 +615,7 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### 5. mol-cspy Integration: Crystal Generation & Custom Metadata
+    ### 6. mol-cspy Integration: Crystal Generation & Custom Metadata
 
     Visualizing predicted molecular crystal candidates generated with **mol-cspy**'s `CrystalGenerator` (`cspy.crystal.generate_crystal.CrystalGenerator`) across space groups 2 ($P\bar{1}$) and 14 ($P2_1/c$). Multiple candidate crystal structures are loaded with interactive trajectory navigation (`multi_traj=False`, `trajectory_slider=True`), automated physical property computation (`compute_extra_data=True`), and a custom **`extra_data` callable** *(feature added in v0.3.0)* that adds space group metadata and asymmetric unit molecule count ($Z'$) directly to the information drawer.
     """)
@@ -643,7 +733,7 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### 6. Config-Driven Visualization: Loading Settings from TOML & Dict
+    ### 7. Config-Driven Visualization: Loading Settings from TOML & Dict
 
     You can define reusable viewer styles and presets using Python dictionaries, TOML formatted strings, or `.toml` configuration files, and supply them via the `config` argument *(feature added in v0.2.0)*. Any explicitly passed arguments to the viewer will overwrite the settings specified in the configuration.
 
@@ -720,7 +810,7 @@ def _():
 @app.cell(hide_code=True)
 def _():
     mo.md(r"""
-    ### 7. 3D Vector & Arrow Visualization
+    ### 8. 3D Vector & Arrow Visualization
 
     **marimol** allows rendering 3D vector arrows *(added in v0.3.0)* to visualize vector quantities such as molecular dipole moments, atomic forces, vibrational normal modes, magnetic spin vectors, and interatomic displacement vectors.
 

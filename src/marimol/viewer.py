@@ -2815,7 +2815,7 @@ def _prepare_frames_data(
 
         for f in frames_data:
             if not f.get("bonds"):
-                f["bonds"] = compute_bonds(f, use_pbc=True)
+                f["bonds"] = compute_bonds(f, use_pbc=unwrap_molecules)
 
     processed_frames = []
     for f in frames_data:
