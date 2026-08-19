@@ -1,6 +1,6 @@
 [project]
 name = "marimol"
-version = "0.3.1"
+version = "0.3.2"
 description = "Molecular visualizer for marimo notebooks"
 readme = "README.md"
 license = { text = "MIT" }
@@ -11,11 +11,20 @@ requires-python = ">=3.11"
 dependencies = [
     "anywidget>=0.11.0",
     "marimo>=0.23.16",
-    "numpy>=1.24.1,<2.0.0",
+    "numpy>=1.24.1",
     "traitlets>=5.16.1",
 ]
 
 [project.optional-dependencies]
+ase = [
+    "ase",
+]
+pymatgen = [
+    "pymatgen",
+]
+cspy = [
+    "cspy",
+]
 external = [
     "ase",
     "pymatgen",

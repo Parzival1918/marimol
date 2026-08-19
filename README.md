@@ -44,7 +44,13 @@ pip install marimol
 To install with support for scientific packages (**ASE**, **Pymatgen**, and **mol-cspy**):
 
 ```bash
+# Install all optional dependencies
 pip install "marimol[external]"
+
+# Or install individual libraries as needed
+pip install "marimol[ase]"
+pip install "marimol[pymatgen]"
+pip install "marimol[cspy]"
 ```
 
 ---
