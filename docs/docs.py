@@ -15,7 +15,12 @@ with app.setup:
     from ase.md.verlet import VelocityVerlet
     from cspy import Molecule
     from cspy.crystal.generate_crystal import CrystalGenerator
-    from marimol import view_ase, view_cspy, view_pymatgen, view_structure
+    from marimol import (
+        view_ase,
+        view_cspy,
+        view_pymatgen,
+        view_structure,
+    )
     from pymatgen.core import Lattice, Structure
 
 
@@ -996,6 +1001,62 @@ def _():
     )
 
     mo.vstack([_code, _viewer])
+    return
+
+
+@app.cell(hide_code=True)
+def _():
+    mo.md(r"""
+    ### 9. Pre-wired Interactive Control Panels
+
+    When visual arguments in a viewer cell are bound to reactive UI elements, changing an option causes marimo to re-execute the viewer cell, creating a new widget and resetting the camera orientation and zoom.
+
+    Using **`viewer.controls()`** *(added in v0.4.0)*, **marimol** provides a pre-wired marimo control panel that mutates settings (background color, render style, auto-spin, projection, structure outlines, atom labels, and transparency) in real time over WebSockets without triggering cell re-runs:
+
+    ```python
+    import marimo as mo
+    from ase.build import molecule
+    from marimol import view_ase
+
+    # Cell 1: Render the viewer once
+    mol = molecule("C6H6")
+    viewer = view_ase(mol, background_color="#0f172a", draw_outlines=True)
+    viewer
+
+    # Cell 2: Render the interactive control panel
+    controls = viewer.controls(layout="grid")
+    controls
+    ```
+
+    #### Available Layout Styles
+    - `layout="grid"` (default): 3-column grouped layout (Appearance, Motion, Display & Tools).
+    - `layout="accordion"`: Collapsible sections (`mo.accordion`).
+    - `layout="tabs"`: Tabbed interface (`mo.ui.tabs`).
+    - `layout="vertical"` / `layout="horizontal"`: Single column or row.
+
+    #### Embedding Individual Controls
+    Individual controls are accessible directly on the panel object (e.g. `controls.background`, `controls.style`, `controls.spin`, `controls.spin_speed`) and can be embedded anywhere into custom notebook layouts:
+
+    ```python
+    mo.hstack([controls.background, controls.style, controls.spin, controls.spin_speed])
+    ```
+
+    #### Exporting & Reusing Configurations
+    You can extract the live configuration from the controls panel (or directly from the viewer) as a **TOML string**, **dictionary**, or **file**, and reuse it across other viewers using the `config` parameter:
+
+    ```python
+    # Cell 3: Live reactive configuration export (automatically updates when controls change!)
+    toml_config = controls.to_toml()  # or controls.to_dict() / viewer.to_toml()
+
+    # Cell 4: Save configuration to a file
+    controls.save_toml("my_theme.toml")  # or viewer.save_config("my_theme.toml")
+
+    # Cell 5: Reuse the customized theme in other viewers
+    other_viewer = view_ase(other_mol, config="my_theme.toml")
+    # or pass the TOML string / dict directly:
+    other_viewer = view_ase(other_mol, config=controls.to_dict())
+    ```
+    """)
     return
 
 

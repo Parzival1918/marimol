@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import os
+from typing import TYPE_CHECKING, Any
 
 import anywidget
 import marimo as mo
@@ -15,6 +18,9 @@ from .utils import (
     process_vectors,
     resolve_color,
 )
+
+if TYPE_CHECKING:
+    from .controls import MoleculeViewerControls
 
 
 class MoleculeViewerWidget(anywidget.AnyWidget):
@@ -2172,70 +2178,65 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     if (vCount > 0) sceneCenter.copy(vSum.divideScalar(vCount));
                 }
 
+                let maxDist = 0;
+                if (cellCenter) {
+                    maxDist = Math.max(maxDist, cellCenter.length());
+                }
+                if (numAtoms > 0) {
+                    for (let i = 0; i < numAtoms; i++) {
+                        const pos = new THREE.Vector3().fromArray(positions[i] || [0,0,0]);
+                        const dist = pos.distanceTo(sceneCenter);
+                        if (dist > maxDist) maxDist = dist;
+                    }
+                }
+                if (vectors && vectors.length > 0) {
+                    for (let i = 0; i < vectors.length; i++) {
+                        const v = vectors[i];
+                        if (v.origin) {
+                            const vOrig = new THREE.Vector3().fromArray(v.origin);
+                            const distO = vOrig.distanceTo(sceneCenter);
+                            if (distO > maxDist) maxDist = distO;
+                        }
+                        if (v.end) {
+                            const vEnd = new THREE.Vector3().fromArray(v.end);
+                            const distE = vEnd.distanceTo(sceneCenter);
+                            if (distE > maxDist) maxDist = distE;
+                        }
+                    }
+                }
+
+                const cameraDist = Math.max(10, maxDist * 3);
+
                 if (!isCameraInitialized || forceFitCamera === true) {
                     controls.target.copy(sceneCenter);
 
-                    let maxDist = 0;
-                    if (cellCenter) {
-                        maxDist = Math.max(maxDist, cellCenter.length());
-                    }
-                    if (numAtoms > 0) {
-                        for (let i = 0; i < numAtoms; i++) {
-                            const pos = new THREE.Vector3().fromArray(positions[i] || [0,0,0]);
-                            const dist = pos.distanceTo(sceneCenter);
-                            if (dist > maxDist) maxDist = dist;
-                        }
-                    }
-                    if (vectors && vectors.length > 0) {
-                        for (let i = 0; i < vectors.length; i++) {
-                            const v = vectors[i];
-                            if (v.origin) {
-                                const vOrig = new THREE.Vector3().fromArray(v.origin);
-                                const distO = vOrig.distanceTo(sceneCenter);
-                                if (distO > maxDist) maxDist = distO;
-                            }
-                            if (v.end) {
-                                const vEnd = new THREE.Vector3().fromArray(v.end);
-                                const distE = vEnd.distanceTo(sceneCenter);
-                                if (distE > maxDist) maxDist = distE;
-                            }
-                        }
-                    }
-
-                    const cameraDist = Math.max(10, maxDist * 3);
-
-                    if (camera.isOrthographicCamera) {
-                        const aspect = container.clientWidth / container.clientHeight;
-                        // Provide a 1.5x margin so the molecule fits comfortably
-                        orthoCamera.left = -maxDist * aspect * 1.5;
-                        orthoCamera.right = maxDist * aspect * 1.5;
-                        orthoCamera.top = maxDist * 1.5;
-                        orthoCamera.bottom = -maxDist * 1.5;
-                    }
+                    const aspect = container.clientWidth / (container.clientHeight || 1);
+                    // Provide a 1.5x margin so the molecule fits comfortably
+                    orthoCamera.left = -maxDist * aspect * 1.5;
+                    orthoCamera.right = maxDist * aspect * 1.5;
+                    orthoCamera.top = maxDist * 1.5;
+                    orthoCamera.bottom = -maxDist * 1.5;
+                    orthoCamera.updateProjectionMatrix();
 
                     applyCameraClipping(maxDist);
 
                     camera.position.set(sceneCenter.x, sceneCenter.y, sceneCenter.z + cameraDist);
+                    camera.quaternion.identity();
 
                     controls.update();
                     isCameraInitialized = true;
-
-                    if (model.get('fog') && model.get('fog_strength') > 0) {
-                        const bgColor = model.get('background_color') || '#ffffff';
-                        const strength = model.get('fog_strength') || 0.5;
-                        const invS = 1.0 / strength;
-                        // Fog starts near the center of the molecule and fully obscures past the back, scaled by strength
-                        scene.fog = new THREE.Fog(bgColor, cameraDist - maxDist * 0.5 * invS, cameraDist + maxDist * 1.5 * invS);
-                    } else {
-                        scene.fog = null;
-                    }
                 } else {
-                    const targetDelta = new THREE.Vector3().subVectors(sceneCenter, controls.target);
-                    if (targetDelta.lengthSq() > 0.0001) {
-                        controls.target.copy(sceneCenter);
-                        camera.position.add(targetDelta);
-                        controls.update();
-                    }
+                    applyCameraClipping(maxDist);
+                }
+
+                if (model.get('fog') && model.get('fog_strength') > 0) {
+                    const bgColor = model.get('background_color') || '#ffffff';
+                    const strength = model.get('fog_strength') || 0.5;
+                    const invS = 1.0 / strength;
+                    const currentDist = camera.position.distanceTo(controls.target) || cameraDist;
+                    scene.fog = new THREE.Fog(bgColor, currentDist - maxDist * 0.5 * invS, currentDist + maxDist * 1.5 * invS);
+                } else {
+                    scene.fog = null;
                 }
 
                 if (isHelpOpen) {
@@ -2246,6 +2247,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             // Watch for changes from Python
             model.on("change:data", () => updateScene(true));
             model.on("change:style", () => updateScene(false));
+            model.on("change:radius_map", () => updateScene(false));
+            model.on("change:default_radius", () => updateScene(false));
+            model.on("change:color_map", () => updateScene(false));
+            model.on("change:default_color", () => updateScene(false));
             model.on("change:width", () => {
                 container.style.width = model.get('width') || '100%';
             });
@@ -2253,14 +2258,14 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 container.style.height = model.get('height') || '400px';
             });
             model.on("change:viewer_outline", applyOutline);
-            model.on("change:fog", () => updateScene(true));
-            model.on("change:fog_strength", () => updateScene(true));
+            model.on("change:fog", () => updateScene(false));
+            model.on("change:fog_strength", () => updateScene(false));
             model.on("change:clip_distance", () => {
                 applyCameraClipping();
                 renderer.render(scene, camera);
             });
-            model.on("change:draw_outlines", () => updateScene(true));
-            model.on("change:draw_labels", () => updateScene(true));
+            model.on("change:draw_outlines", () => updateScene(false));
+            model.on("change:draw_labels", () => updateScene(false));
             model.on("change:show_axes", () => {
                 if (isHelpOpen) updateHelpContent();
             });
@@ -2320,8 +2325,36 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const newProj = model.get('projection');
                 const newCamera = newProj === 'orthographic' ? orthoCamera : persCamera;
                 if (camera !== newCamera) {
-                    newCamera.position.copy(camera.position);
-                    newCamera.quaternion.copy(camera.quaternion);
+                    const aspect = container.clientWidth / (container.clientHeight || 1);
+                    orthoCamera.left = -currentMaxDist * aspect * 1.5;
+                    orthoCamera.right = currentMaxDist * aspect * 1.5;
+                    orthoCamera.top = currentMaxDist * 1.5;
+                    orthoCamera.bottom = -currentMaxDist * 1.5;
+
+                    const dir = new THREE.Vector3().subVectors(camera.position, controls.target);
+                    const dist = dir.length() || 10;
+                    const normDir = dist > 0.0001 ? dir.clone().normalize() : new THREE.Vector3(0, 0, 1);
+
+                    const halfFovRad = (persCamera.fov * Math.PI) / 360.0;
+                    const tanHalfFov = Math.tan(halfFovRad);
+                    const orthoHeight = orthoCamera.top - orthoCamera.bottom;
+
+                    if (newProj === 'orthographic') {
+                        const visibleHeightInPers = 2.0 * dist * tanHalfFov;
+                        orthoCamera.zoom = visibleHeightInPers > 0 ? (orthoHeight / visibleHeightInPers) : 1.0;
+                        orthoCamera.position.copy(controls.target).addScaledVector(normDir, dist);
+                        orthoCamera.quaternion.copy(camera.quaternion);
+                        orthoCamera.up.copy(camera.up);
+                        orthoCamera.updateProjectionMatrix();
+                    } else {
+                        const orthoZoom = orthoCamera.zoom || 1.0;
+                        const visibleHeightInOrtho = orthoHeight / orthoZoom;
+                        const requiredDist = visibleHeightInOrtho / (2.0 * tanHalfFov);
+                        persCamera.position.copy(controls.target).addScaledVector(normDir, Math.max(1.0, requiredDist));
+                        persCamera.quaternion.copy(camera.quaternion);
+                        persCamera.up.copy(camera.up);
+                        persCamera.updateProjectionMatrix();
+                    }
 
                     camera = newCamera;
                     controls.object = camera;
@@ -2331,7 +2364,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     } else {
                         camera.clearViewOffset();
                     }
-                    updateScene(true);
+                    controls.update();
+                    updateScene(false);
                 }
             });
             updateScene();
@@ -2726,6 +2760,133 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     record_include_bgd = traitlets.Bool(False).tag(sync=True)
     record_include_ui = traitlets.Bool(False).tag(sync=True)
     clip_distance = traitlets.Float(0.0, allow_none=True).tag(sync=True)
+
+    def set_style(self, style: str | dict) -> None:
+        """
+        Dynamically update the visualization style in real time.
+
+        Parameters
+        ----------
+        style : str or dict
+            One of 'ball-and-stick', 'vdw', 'wireframe', or a custom style dictionary.
+
+        *(added in v0.4.0)*
+        """
+        resolved_style = STYLES.get(style, STYLES["vdw"]) if isinstance(style, str) else style
+        use_vdw = resolved_style.get("use_vdw_radii", False)
+        self.radius_map = VDW_RADII if use_vdw else ATOMIC_RADII
+        self.default_radius = DEFAULT_VDW_RADIUS if use_vdw else DEFAULT_RADIUS
+        self.style = resolved_style
+
+    def set_background_color(self, color: str) -> None:
+        """
+        Dynamically update the viewer background color in real time.
+
+        Parameters
+        ----------
+        color : str
+            A color name (e.g. 'white', 'black', 'transparent') or hex string (e.g. '#0f172a').
+
+        *(added in v0.4.0)*
+        """
+        self.background_color = resolve_color(color)
+
+    def set_spin(
+        self,
+        spin: bool,
+        speed: float | None = None,
+        axis: tuple[float, float, float] | list[float] | None = None,
+    ) -> None:
+        """
+        Dynamically update auto-spin settings.
+
+        Parameters
+        ----------
+        spin : bool
+            Whether to spin the 3D model.
+        speed : float, optional
+            Spin speed.
+        axis : tuple or list of 3 floats, optional
+            Cartesian axis of rotation.
+
+        *(added in v0.4.0)*
+        """
+        self.spin = spin
+        if speed is not None:
+            self.spin_speed = float(speed)
+        if axis is not None:
+            self.spin_axis = list(axis)
+
+    def controls(
+        self,
+        layout: str = "grid",
+        include: list[str] | None = None,
+        exclude: list[str] | None = None,
+    ) -> MoleculeViewerControls:
+        """
+        Generate a pre-wired interactive marimo UI control panel for this viewer.
+
+        Parameters
+        ----------
+        layout : str, optional
+            Layout style: 'grid' (default), 'accordion', 'tabs', 'vertical', 'horizontal'.
+        include : list of str, optional
+            Controls to include.
+        exclude : list of str, optional
+            Controls to exclude.
+
+        Returns
+        -------
+        MoleculeViewerControls
+            Interactive controls container.
+
+        *(added in v0.4.0)*
+        """
+        from .controls import create_controls
+
+        return create_controls(self, layout=layout, include=include, exclude=exclude)
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Extract the current configuration of this viewer as a dictionary.
+
+        *(added in v0.4.0)*
+        """
+        from .controls import get_viewer_config
+
+        return get_viewer_config(self)
+
+    def get_config(self) -> dict[str, Any]:
+        """
+        Get the current configuration dictionary of this viewer.
+
+        *(added in v0.4.0)*
+        """
+        return self.to_dict()
+
+    def to_toml(self) -> str:
+        """
+        Extract the current configuration of this viewer as a formatted TOML string.
+
+        *(added in v0.4.0)*
+        """
+        from .utils import dict_to_toml
+
+        return dict_to_toml(self.to_dict())
+
+    def save_config(self, path: str | os.PathLike) -> None:
+        """
+        Save the current viewer configuration to a TOML file.
+
+        Parameters
+        ----------
+        path : str or os.PathLike
+            Path to the output TOML file.
+
+        *(added in v0.4.0)*
+        """
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(self.to_toml())
 
 
 STYLES = {

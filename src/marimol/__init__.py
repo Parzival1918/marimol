@@ -1,8 +1,10 @@
 import importlib.metadata
 
+from .controls import MoleculeViewerControls, controls, create_controls, get_viewer_config
 from .external import view_ase, view_cspy, view_pymatgen
 from .utils import (
     compute_extra_data,
+    dict_to_toml,
     get_color,
     get_radius,
     parse_toml_config,
@@ -18,6 +20,11 @@ __all__ = [
     "__version__",
     "view_structure",
     "MoleculeViewerWidget",
+    "MoleculeViewerControls",
+    "create_controls",
+    "controls",
+    "get_viewer_config",
+    "dict_to_toml",
     "get_color",
     "get_radius",
     "resolve_color",

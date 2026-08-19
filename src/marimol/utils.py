@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import os
 import tomllib
+from typing import Any
 
 import numpy as np
 
@@ -524,6 +525,46 @@ def parse_toml_config(config: dict | str | os.PathLike) -> dict:
             return tomllib.loads(config)
 
     raise TypeError(f"Expected dict, str, or os.PathLike for config, got {type(config).__name__}")
+
+
+def dict_to_toml(config: dict[str, Any]) -> str:
+    """
+    Format a configuration dictionary as a TOML string.
+
+    Parameters
+    ----------
+    config : dict
+        A dictionary containing viewer configuration key-value pairs.
+
+    Returns
+    -------
+    str
+        Formatted TOML configuration string.
+
+    *(added in v0.4.0)*
+    """
+    lines: list[str] = []
+    for k, v in config.items():
+        if isinstance(v, bool):
+            lines.append(f"{k} = {'true' if v else 'false'}")
+        elif isinstance(v, (int, float)):
+            lines.append(f"{k} = {v}")
+        elif isinstance(v, str):
+            lines.append(f'{k} = "{v}"')
+        elif isinstance(v, (list, tuple)):
+            items_str = ", ".join(f"{x}" if isinstance(x, (int, float)) else f'"{x}"' for x in v)
+            lines.append(f"{k} = [{items_str}]")
+        elif isinstance(v, dict):
+            items_str = ", ".join(
+                f"{sub_k} = {'true' if sub_v else 'false'}"
+                if isinstance(sub_v, bool)
+                else f"{sub_k} = {sub_v}"
+                if isinstance(sub_v, (int, float))
+                else f'{sub_k} = "{sub_v}"'
+                for sub_k, sub_v in v.items()
+            )
+            lines.append(f"{k} = {{{items_str}}}")
+    return "\n".join(lines) + "\n"
 
 
 def _resolve_vector_point(

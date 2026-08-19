@@ -137,6 +137,55 @@ f"Currently viewing trajectory frame: {current_step}"
 
 ---
 
+## 🎛️ Interactive Controls Panel *(added in v0.4.0)*
+
+When visual parameters are passed directly into a viewer cell, changing them re-runs the cell and resets the camera viewpoint. **marimol** provides **`viewer.controls()`** to create a pre-wired marimo UI control panel that mutates settings (background color, style, spin, projection, outlines, transparency, etc.) in real time without re-running the viewer cell or resetting the camera:
+
+```python
+# Cell 1: Instantiate the viewer once
+viewer = view_ase(mol)
+viewer
+```
+
+```python
+# Cell 2: Display interactive controls (updates 3D scene smoothly in place)
+controls = viewer.controls(layout="grid")
+controls
+```
+
+### Layout Options
+- `layout="grid"` (default): Clean multi-column grouped layout (Appearance, Motion, Display & Tools).
+- `layout="accordion"`: Compact collapsible sections (`mo.accordion`).
+- `layout="tabs"`: Tabbed navigation (`mo.ui.tabs`).
+- `layout="vertical"` / `layout="horizontal"`: Single row or column stack.
+
+### Custom Layouts with Individual Controls
+You can also unpack or embed individual pre-wired controls anywhere in your custom notebook layouts:
+
+```python
+mo.hstack([controls.background, controls.style, controls.spin, controls.spin_speed])
+```
+
+### 📄 Exporting & Reusing Configurations
+You can extract the live configuration from the controls panel (or directly from the viewer) as a **TOML string**, **dictionary**, or **file**, and reuse it across other viewers with the `config` parameter:
+
+```python
+# Cell 3: Live reactive configuration export (automatically updates when controls change!)
+toml_config = controls.to_toml()  # or controls.to_dict() / viewer.to_toml()
+```
+
+```python
+# Cell 4: Save configuration to disk
+controls.save_toml("my_theme.toml")  # or viewer.save_config("my_theme.toml")
+
+# Cell 5: Apply the saved theme to other viewers
+other_viewer = view_ase(other_mol, config="my_theme.toml")
+# or pass the live TOML string / dict directly:
+other_viewer = view_ase(other_mol, config=controls.to_dict())
+```
+
+---
+
 ## 🎮 Viewer Controls & Shortcuts
 
 | Action | Control |
@@ -259,6 +308,7 @@ uv run marimo edit examples/01_interactive_molecule_viewer.py
 | [`04_toml_presets_and_themes.py`](examples/04_toml_presets_and_themes.py) | Reusable visual presets loaded from TOML via `config` with parameter overrides. *(added in v0.2.0)* |
 | [`05_cspy_crystal_generation_and_custom_extra_data.py`](examples/05_cspy_crystal_generation_and_custom_extra_data.py) | Crystal structure generation across space groups with custom `extra_data` callable. *(added in v0.3.0)* |
 | [`06_vector_data_and_arrows.py`](examples/06_vector_data_and_arrows.py) | 3D vector arrows for molecular dipole moments, vibrational forces, magnetic spins, and transparency. *(added in v0.3.0)* |
+| [`07_interactive_controls_panel.py`](examples/07_interactive_controls_panel.py) | Pre-wired control panel with live TOML export and theme persistence across viewers, allowing to change the viewer settings without rerunning the cell. *(added in v0.4.0)* |
 
 ---
 
