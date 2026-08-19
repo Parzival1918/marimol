@@ -1,12 +1,15 @@
 import numpy as np
-from cspy import Molecule
-from cspy.crystal.generate_crystal import CrystalGenerator
+import pytest
 
 from marimol.external import _convert_cspy_structure
 from marimol.utils import compute_bonds, unwrap_molecules
 
 
 def test_unwrap_cspy_methane_crystals():
+    pytest.importorskip("cspy")
+    from cspy import Molecule
+    from cspy.crystal.generate_crystal import CrystalGenerator
+
     xyz = """5
 methane
 C 2.629 2.629 2.629

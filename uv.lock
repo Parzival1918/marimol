@@ -1066,9 +1066,18 @@ all = [
     { name = "cspy" },
     { name = "pymatgen" },
 ]
+ase = [
+    { name = "ase" },
+]
+cspy = [
+    { name = "cspy" },
+]
 external = [
     { name = "ase" },
     { name = "cspy" },
+    { name = "pymatgen" },
+]
+pymatgen = [
     { name = "pymatgen" },
 ]
 
@@ -1083,15 +1092,18 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anywidget", specifier = ">=0.11.0" },
+    { name = "ase", marker = "extra == 'ase'" },
     { name = "ase", marker = "extra == 'external'" },
+    { name = "cspy", marker = "extra == 'cspy'", git = "https://gitlab.com/mol-cspy/mol-cspy?branch=main" },
     { name = "cspy", marker = "extra == 'external'", git = "https://gitlab.com/mol-cspy/mol-cspy?branch=main" },
     { name = "marimo", specifier = ">=0.23.16" },
     { name = "marimol", extras = ["external"], marker = "extra == 'all'" },
-    { name = "numpy", specifier = ">=1.24.1,<2.0.0" },
+    { name = "numpy", specifier = ">=1.24.1" },
     { name = "pymatgen", marker = "extra == 'external'" },
+    { name = "pymatgen", marker = "extra == 'pymatgen'" },
     { name = "traitlets", specifier = ">=5.16.1" },
 ]
-provides-extras = ["external", "all"]
+provides-extras = ["ase", "pymatgen", "cspy", "external", "all"]
 
 [package.metadata.requires-dev]
 dev = [

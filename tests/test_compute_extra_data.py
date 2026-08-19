@@ -351,6 +351,7 @@ def test_view_pymatgen_custom_extra_data():
 
 
 def test_view_cspy_custom_extra_data():
+    pytest.importorskip("cspy")
     import numpy as np
     from cspy import Molecule
 
@@ -413,8 +414,14 @@ def test_external_extra_data_invalid_types():
     with pytest.raises(TypeError, match="extra_data must be a callable"):
         view_pymatgen(Structure(Lattice.cubic(3.0), ["C"], [[0, 0, 0]]), extra_data=12345)
 
-    with pytest.raises(TypeError, match="extra_data must be a callable"):
-        view_cspy(mol, extra_data=[])
+    from marimol.external import CSPY
+
+    if CSPY:
+        with pytest.raises(TypeError, match="extra_data must be a callable"):
+            view_cspy(mol, extra_data=[])
+    else:
+        with pytest.raises(ImportError, match="mol-cspy is not installed"):
+            view_cspy(mol, extra_data=[])
 
     # Callable returning non-dict
     with pytest.raises(TypeError, match="extra_data callable must return a dict"):
