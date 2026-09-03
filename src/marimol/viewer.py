@@ -20,14 +20,200 @@ from .utils import (
 class MoleculeViewerWidget(anywidget.AnyWidget):
     """
     A widget for visualizing molecules and periodic structures.
+
+    Features a shared singleton WebGL rendering architecture with viewport hibernation
+    and demand-driven rendering *(added in v0.3.3)*, allowing dozens of simultaneous
+    viewers without hitting browser WebGL context limits.
     """
 
     _esm = """
     import * as THREE from 'https://esm.sh/three@0.160.0';
     import { TrackballControls } from 'https://esm.sh/three@0.160.0/addons/controls/TrackballControls.js';
 
+    function getOrCreateRenderManager() {
+        if (window.__MARIMOL_RENDER_MANAGER__) {
+            return window.__MARIMOL_RENDER_MANAGER__;
+        }
+
+        let sharedRenderer = null;
+        try {
+            sharedRenderer = new THREE.WebGLRenderer({
+                antialias: true,
+                alpha: true,
+                preserveDrawingBuffer: true,
+                powerPreference: 'high-performance'
+            });
+            sharedRenderer.autoClear = false;
+        } catch (err) {
+            console.error('marimol: Failed to initialize WebGL context:', err);
+        }
+
+        const viewers = new Set();
+        let animationId = null;
+        let isLoopRunning = false;
+
+        if (sharedRenderer && sharedRenderer.domElement) {
+            sharedRenderer.domElement.addEventListener('webglcontextlost', (e) => {
+                e.preventDefault();
+                console.warn('marimol: Shared WebGL context lost.');
+            }, false);
+
+            sharedRenderer.domElement.addEventListener('webglcontextrestored', () => {
+                console.info('marimol: Shared WebGL context restored.');
+                for (const v of viewers) {
+                    v.requestRender();
+                }
+            }, false);
+        }
+
+        const manager = {
+            renderer: sharedRenderer,
+            viewers,
+            register(viewer) {
+                viewers.add(viewer);
+                this.requestRender(viewer);
+            },
+            unregister(viewer) {
+                viewers.delete(viewer);
+                if (viewers.size === 0) {
+                    this.stopLoop();
+                }
+            },
+            requestRender(viewer) {
+                if (viewer) {
+                    viewer.needsRender = true;
+                }
+                this.startLoop();
+            },
+            renderViewer(viewer) {
+                if (!sharedRenderer) return;
+                const container = viewer.container;
+                const cW = container.clientWidth;
+                const cH = container.clientHeight;
+                if (cW === 0 || cH === 0) return;
+
+                const dpr = (viewer.isRecording && viewer.recordPixelRatio)
+                    ? viewer.recordPixelRatio
+                    : (window.devicePixelRatio || 1);
+                const targetW = Math.round(cW * dpr);
+                const targetH = Math.round(cH * dpr);
+
+                if (sharedRenderer.domElement.width !== targetW || sharedRenderer.domElement.height !== targetH) {
+                    sharedRenderer.setPixelRatio(dpr);
+                    sharedRenderer.setSize(cW, cH, false);
+                }
+
+                const canvas = viewer.canvas;
+                if (canvas.width !== targetW || canvas.height !== targetH) {
+                    canvas.width = targetW;
+                    canvas.height = targetH;
+                }
+
+                // 1. Render 3D scene
+                sharedRenderer.setViewport(0, 0, cW, cH);
+                sharedRenderer.clear();
+                sharedRenderer.render(viewer.scene, viewer.camera);
+
+                // 2. Render axes overlay if enabled
+                if (viewer.model.get('show_axes') && viewer.axesScene && viewer.axesCamera) {
+                    viewer.axesCamera.position.copy(viewer.camera.position).sub(viewer.controls.target).normalize().multiplyScalar(4);
+                    viewer.axesCamera.quaternion.copy(viewer.camera.quaternion);
+
+                    sharedRenderer.clearDepth();
+                    sharedRenderer.setViewport(10, 10, 80, 80);
+                    sharedRenderer.render(viewer.axesScene, viewer.axesCamera);
+                }
+
+                // 3. Blit WebGL buffer onto viewer's 2D canvas
+                viewer.ctx.clearRect(0, 0, targetW, targetH);
+                viewer.ctx.drawImage(sharedRenderer.domElement, 0, 0);
+
+                // 4. Update labels overlay
+                if (typeof viewer.updateLabels === 'function') {
+                    viewer.updateLabels();
+                }
+
+                // 5. Handle video recording frame if recording
+                if (viewer.isRecording && typeof viewer.handleRecordFrame === 'function') {
+                    viewer.handleRecordFrame(sharedRenderer.domElement);
+                }
+
+                viewer.needsRender = false;
+            },
+            startLoop() {
+                if (isLoopRunning) return;
+                isLoopRunning = true;
+                const tick = () => {
+                    let anyActive = false;
+
+                    for (const viewer of viewers) {
+                        if (!viewer.isVisible) continue;
+
+                        const isSpinning = viewer.model.get("spin") && viewer.model.get("spin_speed") !== 0;
+                        viewer.isSpinning = isSpinning;
+
+                        if (isSpinning) {
+                            const speed = viewer.model.get("spin_speed") * 0.01;
+                            const axisArr = viewer.model.get("spin_axis");
+                            const axis = new THREE.Vector3(axisArr[0], axisArr[1], axisArr[2]).normalize();
+                            if (axis.lengthSq() > 0.001) {
+                                viewer.camera.position.sub(viewer.controls.target);
+                                viewer.camera.position.applyAxisAngle(axis, speed);
+                                viewer.camera.position.add(viewer.controls.target);
+
+                                viewer.camera.up.applyAxisAngle(axis, speed);
+                                viewer.camera.lookAt(viewer.controls.target);
+                                viewer.needsRender = true;
+                            }
+                            anyActive = true;
+                        }
+
+                        if (viewer.isInteracting || viewer.dampingTicks > 0) {
+                            viewer.controls.update();
+                            if (!viewer.isInteracting && viewer.dampingTicks > 0) {
+                                viewer.dampingTicks--;
+                            }
+                            viewer.needsRender = true;
+                            anyActive = true;
+                        }
+
+                        if (viewer.isRecording) {
+                            anyActive = true;
+                            viewer.needsRender = true;
+                        }
+
+                        if (viewer.needsRender) {
+                            this.renderViewer(viewer);
+                        }
+                    }
+
+                    if (anyActive) {
+                        animationId = requestAnimationFrame(tick);
+                    } else {
+                        isLoopRunning = false;
+                        animationId = null;
+                    }
+                };
+
+                animationId = requestAnimationFrame(tick);
+            },
+            stopLoop() {
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                    animationId = null;
+                }
+                isLoopRunning = false;
+            }
+        };
+
+        window.__MARIMOL_RENDER_MANAGER__ = manager;
+        return manager;
+    }
+
     export default {
         render({ model, el }) {
+            const renderManager = getOrCreateRenderManager();
+
             // Container setup
             const container = document.createElement('div');
             container.style.width = model.get('width') || '100%';
@@ -99,17 +285,15 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             };
             applyCameraClipping();
 
-            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-            renderer.setSize(container.clientWidth, container.clientHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.autoClear = false; // We need to manage clearing for multiple viewports
-            renderer.domElement.style.position = 'absolute';
-            renderer.domElement.style.top = '0';
-            renderer.domElement.style.left = '0';
-            renderer.domElement.style.width = '100%';
-            renderer.domElement.style.height = '100%';
-            renderer.domElement.style.display = 'block';
-            container.appendChild(renderer.domElement);
+            const viewerCanvas = document.createElement('canvas');
+            viewerCanvas.style.position = 'absolute';
+            viewerCanvas.style.top = '0';
+            viewerCanvas.style.left = '0';
+            viewerCanvas.style.width = '100%';
+            viewerCanvas.style.height = '100%';
+            viewerCanvas.style.display = 'block';
+            container.appendChild(viewerCanvas);
+            const viewerCtx = viewerCanvas.getContext('2d');
 
             // Axes setup (overlay)
             const axesScene = new THREE.Scene();
@@ -159,11 +343,86 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             // Orthographic bounds: left, right, top, bottom, near, far
             const axesCamera = new THREE.OrthographicCamera(-2.5, 2.5, 2.5, -2.5, 0.1, 10);
 
-            const controls = new TrackballControls(camera, renderer.domElement);
+            const controls = new TrackballControls(camera, viewerCanvas);
             controls.rotateSpeed = 3.0;
             controls.zoomSpeed = 1.2;
             controls.panSpeed = 0.8;
             controls.noPan = true; // We use custom panning via setViewOffset to preserve the rotation center
+
+            const viewerObj = {
+                container,
+                canvas: viewerCanvas,
+                ctx: viewerCtx,
+                scene,
+                get camera() { return camera; },
+                controls,
+                axesScene,
+                axesCamera,
+                model,
+                isVisible: true,
+                needsRender: true,
+                isSpinning: false,
+                isInteracting: false,
+                isRecording: false,
+                recordPixelRatio: null,
+                dampingTicks: 0,
+                requestRender() {
+                    this.needsRender = true;
+                    renderManager.requestRender(this);
+                },
+                updateLabels: null,
+                handleRecordFrame: (sourceElement) => {
+                    if (!isRecording) return;
+                    if (recordCanvas && recordCtx) {
+                        const rW = recordCanvas.width;
+                        const rH = recordCanvas.height;
+                        const includeBgd = model.get('record_include_bgd');
+                        const includeUi = model.get('record_include_ui');
+                        if (includeBgd) {
+                            recordCtx.fillStyle = model.get('background_color') || '#ffffff';
+                            recordCtx.fillRect(0, 0, rW, rH);
+                        } else {
+                            recordCtx.clearRect(0, 0, rW, rH);
+                        }
+                        recordCtx.drawImage(sourceElement, 0, 0, rW, rH);
+                        if (includeUi) {
+                            const targetPixelRatio = viewerObj.recordPixelRatio || (window.devicePixelRatio || 1);
+                            drawOverlaysToCanvas(recordCtx, targetPixelRatio);
+                        }
+                    }
+                }
+            };
+
+            controls.addEventListener('change', () => {
+                viewerObj.dampingTicks = 30;
+                viewerObj.requestRender();
+            });
+            controls.addEventListener('start', () => {
+                viewerObj.isInteracting = true;
+                renderManager.startLoop();
+            });
+            controls.addEventListener('end', () => {
+                viewerObj.isInteracting = false;
+                viewerObj.requestRender();
+            });
+
+            const intersectionObserver = new IntersectionObserver((entries) => {
+                for (const entry of entries) {
+                    if (entry.target === container) {
+                        viewerObj.isVisible = entry.isIntersecting;
+                        if (entry.isIntersecting) {
+                            viewerObj.requestRender();
+                            if (viewerObj.isSpinning || viewerObj.isRecording) {
+                                renderManager.startLoop();
+                            }
+                        }
+                    }
+                }
+            }, {
+                root: null,
+                threshold: 0.01
+            });
+            intersectionObserver.observe(container);
 
             // Geometry and Material for Atoms
             // We use a high segment count for smooth spheres, but InstancedMesh keeps it incredibly fast
@@ -961,7 +1220,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const origHeight = container.clientHeight;
                 const targetWidth = Math.round(origWidth * scale);
                 const targetHeight = Math.round(origHeight * scale);
-                const origPixelRatio = renderer.getPixelRatio();
+                const sharedRenderer = renderManager.renderer;
+                if (!sharedRenderer) return;
 
                 // Trigger native file picker synchronously while user gesture is active
                 let fileHandlePromise = null;
@@ -979,27 +1239,27 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     }
                 }
 
-                // Render high-DPI frame
-                renderer.setPixelRatio(1);
-                renderer.setSize(targetWidth, targetHeight, false);
+                // Render high-DPI frame on shared WebGL renderer
+                sharedRenderer.setPixelRatio(1);
+                sharedRenderer.setSize(targetWidth, targetHeight, false);
 
                 if (camera.isPerspectiveCamera) {
                     camera.aspect = targetWidth / targetHeight;
                     camera.updateProjectionMatrix();
                 }
 
-                renderer.setViewport(0, 0, targetWidth, targetHeight);
-                renderer.clear();
-                renderer.render(scene, camera);
+                sharedRenderer.setViewport(0, 0, targetWidth, targetHeight);
+                sharedRenderer.clear();
+                sharedRenderer.render(scene, camera);
 
                 if (model.get('show_axes')) {
                     axesCamera.position.copy(camera.position).sub(controls.target).normalize().multiplyScalar(4);
                     axesCamera.quaternion.copy(camera.quaternion);
-                    renderer.clearDepth();
+                    sharedRenderer.clearDepth();
                     const axesSize = Math.round(80 * scale);
                     const axesMargin = Math.round(10 * scale);
-                    renderer.setViewport(axesMargin, axesMargin, axesSize, axesSize);
-                    renderer.render(axesScene, axesCamera);
+                    sharedRenderer.setViewport(axesMargin, axesMargin, axesSize, axesSize);
+                    sharedRenderer.render(axesScene, axesCamera);
                 }
 
                 const includeBgd = model.get('record_include_bgd');
@@ -1008,7 +1268,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 let blobPromise;
                 if (!includeBgd && !includeUi) {
                     blobPromise = new Promise((resolve) => {
-                        renderer.domElement.toBlob(resolve, 'image/png');
+                        sharedRenderer.domElement.toBlob(resolve, 'image/png');
                     });
                 } else {
                     const exportCanvas = document.createElement('canvas');
@@ -1021,7 +1281,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         ctx.fillRect(0, 0, targetWidth, targetHeight);
                     }
 
-                    ctx.drawImage(renderer.domElement, 0, 0, targetWidth, targetHeight);
+                    ctx.drawImage(sharedRenderer.domElement, 0, 0, targetWidth, targetHeight);
 
                     if (includeUi) {
                         drawOverlaysToCanvas(ctx, scale);
@@ -1032,13 +1292,12 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     });
                 }
 
-                // Restore live renderer dimensions
-                renderer.setPixelRatio(origPixelRatio);
-                renderer.setSize(origWidth, origHeight);
+                // Restore camera projection and re-render normal view
                 if (camera.isPerspectiveCamera) {
                     camera.aspect = origWidth / origHeight;
                     camera.updateProjectionMatrix();
                 }
+                viewerObj.requestRender();
 
                 try {
                     let fileHandle = null;
@@ -1103,9 +1362,16 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 const fps = model.get('traj_fps') || 30;
                 const dpi = model.get('dpi') || 200;
                 const targetPixelRatio = Math.max(1.0, Math.min(3.0, dpi / 96.0));
-                origPixelRatioBeforeRecord = renderer.getPixelRatio();
-                renderer.setPixelRatio(targetPixelRatio);
-                renderer.setSize(container.clientWidth, container.clientHeight);
+                viewerObj.recordPixelRatio = targetPixelRatio;
+
+                const frames = model.get('data') || [];
+                const multiTraj = model.get('multi_traj') !== false;
+                if (frames.length > 1 && multiTraj && !isPlaying) {
+                    setFrame(0);
+                }
+
+                isRecording = true;
+                viewerObj.isRecording = true;
 
                 const includeBgd = model.get('record_include_bgd');
                 const includeUi = model.get('record_include_ui');
@@ -1113,8 +1379,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 let stream = null;
                 if (includeBgd || includeUi) {
                     recordCanvas = document.createElement('canvas');
-                    recordCanvas.width = renderer.domElement.width;
-                    recordCanvas.height = renderer.domElement.height;
+                    recordCanvas.width = Math.round(container.clientWidth * targetPixelRatio);
+                    recordCanvas.height = Math.round(container.clientHeight * targetPixelRatio);
                     recordCanvas.style.position = 'fixed';
                     recordCanvas.style.top = '-9999px';
                     recordCanvas.style.left = '-9999px';
@@ -1125,23 +1391,24 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     document.body.appendChild(recordCanvas);
 
                     recordCtx = recordCanvas.getContext('2d');
-                    if (includeBgd) {
-                        recordCtx.fillStyle = model.get('background_color') || '#ffffff';
-                        recordCtx.fillRect(0, 0, recordCanvas.width, recordCanvas.height);
-                    }
-                    recordCtx.drawImage(renderer.domElement, 0, 0);
-                    if (includeUi) {
-                        drawOverlaysToCanvas(recordCtx, targetPixelRatio);
-                    }
+                }
+
+                // Synchronously render THIS viewer now so both viewerCanvas and recordCanvas
+                // contain the pristine, correct first frame of THIS viewer before the recorder captures it.
+                renderManager.renderViewer(viewerObj);
+
+                if (includeBgd || includeUi) {
                     stream = recordCanvas.captureStream ? recordCanvas.captureStream(Math.max(15, Math.min(60, fps))) : null;
                 } else {
-                    stream = renderer.domElement.captureStream ? renderer.domElement.captureStream(Math.max(15, Math.min(60, fps))) : null;
+                    stream = viewerCanvas.captureStream ? viewerCanvas.captureStream(Math.max(15, Math.min(60, fps))) : null;
                 }
 
                 if (!stream) {
                     console.warn('HTMLCanvasElement.captureStream is not supported in this browser.');
-                    renderer.setPixelRatio(origPixelRatioBeforeRecord);
-                    renderer.setSize(container.clientWidth, container.clientHeight);
+                    isRecording = false;
+                    viewerObj.isRecording = false;
+                    viewerObj.recordPixelRatio = null;
+                    viewerObj.requestRender();
                     if (recordCanvas && recordCanvas.parentNode) {
                         recordCanvas.parentNode.removeChild(recordCanvas);
                     }
@@ -1158,8 +1425,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     mediaRecorder = new MediaRecorder(stream, options);
                 } catch (err) {
                     console.warn('Could not initialize MediaRecorder:', err);
-                    renderer.setPixelRatio(origPixelRatioBeforeRecord);
-                    renderer.setSize(container.clientWidth, container.clientHeight);
+                    isRecording = false;
+                    viewerObj.isRecording = false;
+                    viewerObj.recordPixelRatio = null;
+                    viewerObj.requestRender();
                     if (recordCanvas && recordCanvas.parentNode) {
                         recordCanvas.parentNode.removeChild(recordCanvas);
                     }
@@ -1175,7 +1444,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 };
 
                 mediaRecorder.start(100);
-                isRecording = true;
+                renderManager.startLoop();
                 recordBtn.innerHTML = stopSvg;
                 recordBtn.style.background = '#e53935';
                 recordBtn.style.color = 'white';
@@ -1190,10 +1459,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     recordingBadge.innerText = `● REC ${mins}:${secs}`;
                 }, 1000);
 
-                const frames = model.get('data') || [];
-                const multiTraj = model.get('multi_traj') !== false;
                 if (frames.length > 1 && multiTraj && !isPlaying) {
-                    setFrame(0);
                     togglePlay();
                 }
             };
@@ -1280,8 +1546,10 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 } catch (err) {
                     console.error('Error saving recorded animation:', err);
                 } finally {
-                    renderer.setPixelRatio(origPixelRatioBeforeRecord || window.devicePixelRatio || 1);
-                    renderer.setSize(container.clientWidth, container.clientHeight);
+                    isRecording = false;
+                    viewerObj.isRecording = false;
+                    viewerObj.recordPixelRatio = null;
+                    viewerObj.requestRender();
                     if (recordCanvas && recordCanvas.parentNode) {
                         recordCanvas.parentNode.removeChild(recordCanvas);
                     }
@@ -1445,6 +1713,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 measureSpheres = [];
                 measureLabel.style.display = 'none';
                 measureLabel.innerText = '';
+                viewerObj.requestRender();
             }
 
             function updateMeasurementUI() {
@@ -1525,6 +1794,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     const dihedral = Math.atan2(y, x) * 180 / Math.PI;
                     measureLabel.innerText = `Dihedral: ${dihedral.toFixed(1)}°`;
                 }
+                viewerObj.requestRender();
             }
 
             measureBtn.addEventListener('click', () => {
@@ -1636,6 +1906,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         scene.remove(atomOutlineMesh);
                     }
                 }
+                viewerObj.requestRender();
             }
 
             model.on("change:selected_atoms", () => {
@@ -2241,6 +2512,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (isHelpOpen) {
                     updateHelpContent();
                 }
+                viewerObj.requestRender();
             }
 
             // Watch for changes from Python
@@ -2248,21 +2520,24 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             model.on("change:style", () => updateScene(false));
             model.on("change:width", () => {
                 container.style.width = model.get('width') || '100%';
+                viewerObj.requestRender();
             });
             model.on("change:height", () => {
                 container.style.height = model.get('height') || '400px';
+                viewerObj.requestRender();
             });
             model.on("change:viewer_outline", applyOutline);
             model.on("change:fog", () => updateScene(true));
             model.on("change:fog_strength", () => updateScene(true));
             model.on("change:clip_distance", () => {
                 applyCameraClipping();
-                renderer.render(scene, camera);
+                viewerObj.requestRender();
             });
             model.on("change:draw_outlines", () => updateScene(true));
             model.on("change:draw_labels", () => updateScene(true));
             model.on("change:show_axes", () => {
                 if (isHelpOpen) updateHelpContent();
+                viewerObj.requestRender();
             });
             model.on("change:show_help", () => {
                 const show = model.get('show_help');
@@ -2283,6 +2558,17 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             model.on("change:vector_outline", () => updateScene(false));
             model.on("change:vector_color", () => updateScene(false));
             model.on("change:structure_transparency", () => updateScene(false));
+            model.on("change:spin", () => {
+                viewerObj.isSpinning = model.get("spin") && model.get("spin_speed") !== 0;
+                viewerObj.requestRender();
+            });
+            model.on("change:spin_speed", () => {
+                viewerObj.isSpinning = model.get("spin") && model.get("spin_speed") !== 0;
+                viewerObj.requestRender();
+            });
+            model.on("change:spin_axis", () => {
+                viewerObj.requestRender();
+            });
             model.on("change:multi_traj", () => {
                 const showPlay = model.get('multi_traj') !== false;
                 btnPlay.style.display = showPlay ? 'flex' : 'none';
@@ -2315,6 +2601,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 if (scene.fog) {
                     scene.fog.color.set(model.get('background_color'));
                 }
+                viewerObj.requestRender();
             });
             model.on("change:projection", () => {
                 const newProj = model.get('projection');
@@ -2346,6 +2633,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             container.addEventListener('mousedown', (e) => {
                 if (e.button === 2) {
                     isPanning = true;
+                    viewerObj.isInteracting = true;
+                    renderManager.startLoop();
                 }
             });
             container.addEventListener('mousemove', (e) => {
@@ -2358,13 +2647,22 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         container.clientWidth, container.clientHeight
                     );
                     camera.updateProjectionMatrix();
+                    viewerObj.requestRender();
                 }
             });
             container.addEventListener('mouseup', (e) => {
-                if (e.button === 2) isPanning = false;
+                if (e.button === 2) {
+                    isPanning = false;
+                    viewerObj.isInteracting = false;
+                    viewerObj.requestRender();
+                }
             });
             container.addEventListener('mouseleave', () => {
-                isPanning = false;
+                if (isPanning) {
+                    isPanning = false;
+                    viewerObj.isInteracting = false;
+                    viewerObj.requestRender();
+                }
             });
 
             // Handle Resize
@@ -2386,8 +2684,8 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     camera.clearViewOffset();
                 }
                 camera.updateProjectionMatrix();
-                renderer.setSize(container.clientWidth, container.clientHeight);
                 controls.handleResize();
+                viewerObj.requestRender();
             });
             resizeObserver.observe(container);
 
@@ -2472,6 +2770,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                                 }
                                 camera.lookAt(controls.target);
                                 controls.update();
+                                viewerObj.requestRender();
                                 return; // Stop processing, we handled the axes click
                             }
                         }
@@ -2531,110 +2830,57 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 }
             });
 
-            // Render Loop
-            let animationId;
+            // --- Update Labels Overlay ---
             const _vec = new THREE.Vector3();
             const _labelRaycaster = new THREE.Raycaster();
-            function animate() {
-                animationId = requestAnimationFrame(animate);
-
-                if (model.get("spin") && model.get("spin_speed") !== 0) {
-                    const speed = model.get("spin_speed") * 0.01;
-                    const axisArr = model.get("spin_axis");
-                    const axis = new THREE.Vector3(axisArr[0], axisArr[1], axisArr[2]).normalize();
-                    if (axis.lengthSq() > 0.001) {
-                        camera.position.sub(controls.target);
-                        camera.position.applyAxisAngle(axis, speed);
-                        camera.position.add(controls.target);
-
-                        camera.up.applyAxisAngle(axis, speed);
-                        camera.lookAt(controls.target);
-                    }
-                }
-
-                controls.update();
-
-                // Update Labels
-                if (labelElements.length > 0) {
-                    const hw = container.clientWidth / 2;
-                    const hh = container.clientHeight / 2;
-                    camera.updateMatrixWorld();
-                    for (let i = 0; i < labelElements.length; i++) {
-                        const item = labelElements[i];
-                        _vec.copy(item.pos).project(camera);
-                        if (_vec.z > 1.0 || _vec.z < -1.0) {
-                            item.el.style.display = 'none';
-                        } else {
-                            // Occlusion test
-                            _labelRaycaster.setFromCamera(_vec, camera);
-                            let occluded = false;
-                            if (atomMesh) {
-                                const hits = _labelRaycaster.intersectObject(atomMesh);
-                                if (hits.length > 0 && hits[0].instanceId !== item.index) {
+            viewerObj.updateLabels = () => {
+                if (labelElements.length === 0) return;
+                const hw = container.clientWidth / 2;
+                const hh = container.clientHeight / 2;
+                if (hw === 0 || hh === 0) return;
+                camera.updateMatrixWorld();
+                for (let i = 0; i < labelElements.length; i++) {
+                    const item = labelElements[i];
+                    _vec.copy(item.pos).project(camera);
+                    if (_vec.z > 1.0 || _vec.z < -1.0) {
+                        item.el.style.display = 'none';
+                    } else {
+                        // Occlusion test
+                        _labelRaycaster.setFromCamera(_vec, camera);
+                        let occluded = false;
+                        if (atomMesh) {
+                            const hits = _labelRaycaster.intersectObject(atomMesh);
+                            if (hits.length > 0 && hits[0].instanceId !== item.index) {
+                                occluded = true;
+                            } else if (bondMesh) {
+                                const bHits = _labelRaycaster.intersectObject(bondMesh);
+                                if (bHits.length > 0 && hits.length > 0 && bHits[0].distance < hits[0].distance) {
                                     occluded = true;
-                                } else if (bondMesh) {
-                                    const bHits = _labelRaycaster.intersectObject(bondMesh);
-                                    if (bHits.length > 0 && hits.length > 0 && bHits[0].distance < hits[0].distance) {
-                                        occluded = true;
-                                    }
                                 }
                             }
+                        }
 
-                            if (occluded) {
-                                item.el.style.display = 'none';
-                            } else {
-                                item.el.style.display = 'block';
-                                const x = (_vec.x * hw) + hw;
-                                const y = -(_vec.y * hh) + hh;
-                                item.el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
-                            }
+                        if (occluded) {
+                            item.el.style.display = 'none';
+                        } else {
+                            item.el.style.display = 'block';
+                            const x = (_vec.x * hw) + hw;
+                            const y = -(_vec.y * hh) + hh;
+                            item.el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
                         }
                     }
                 }
+            };
 
-                // 1. Render main scene
-                renderer.setViewport(0, 0, container.clientWidth, container.clientHeight);
-                renderer.clear();
-                renderer.render(scene, camera);
-
-                // 2. Render axes overlay in bottom left if requested
-                if (model.get('show_axes')) {
-                    // Position axes camera behind the origin to match main camera orientation
-                    axesCamera.position.copy(camera.position).sub(controls.target).normalize().multiplyScalar(4);
-                    // Instead of lookAt (which suffers from Gimbal lock when aligned with Y), directly copy the exact rotation
-                    axesCamera.quaternion.copy(camera.quaternion);
-
-                    renderer.clearDepth();
-                    // Draw in bottom left corner (80x80)
-                    renderer.setViewport(10, 10, 80, 80);
-                    renderer.render(axesScene, axesCamera);
-                }
-
-                // 3. Composite recording frame if recording with custom background or UI
-                if (isRecording && recordCanvas && recordCtx) {
-                    const rW = recordCanvas.width;
-                    const rH = recordCanvas.height;
-                    const includeBgd = model.get('record_include_bgd');
-                    const includeUi = model.get('record_include_ui');
-                    if (includeBgd) {
-                        recordCtx.fillStyle = model.get('background_color') || '#ffffff';
-                        recordCtx.fillRect(0, 0, rW, rH);
-                    } else {
-                        recordCtx.clearRect(0, 0, rW, rH);
-                    }
-                    recordCtx.drawImage(renderer.domElement, 0, 0, rW, rH);
-                    if (includeUi) {
-                        const targetPixelRatio = renderer.getPixelRatio() || 1;
-                        drawOverlaysToCanvas(recordCtx, targetPixelRatio);
-                    }
-                }
-            }
-            animate();
+            // Register viewer with shared render manager and request initial render
+            renderManager.register(viewerObj);
+            viewerObj.requestRender();
 
             // Cleanup when cell is deleted or widget is destroyed
             return () => {
-                cancelAnimationFrame(animationId);
+                renderManager.unregister(viewerObj);
                 resizeObserver.disconnect();
+                intersectionObserver.disconnect();
                 window.removeEventListener('keydown', handleKeyDown);
                 if (isRecording) {
                     stopRecording();
@@ -2685,7 +2931,6 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     });
                     vectorGroup = null;
                 }
-                renderer.dispose();
             };
         }
     }
