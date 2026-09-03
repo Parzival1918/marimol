@@ -30,6 +30,7 @@ For a more in depth documentation which includes interactive examples see: [mari
 - 📊 **Metadata Drawer**: Instant inspection of unit cell parameters ($a, b, c, \alpha, \beta, \gamma$), volume, density, and custom calculation results.
 - 📸 **Image Capture & Video Recording** *(added in v0.2.0)*: High-resolution PNG screenshots (<kbd>S</kbd>) and WebM/MP4 animation recordings (<kbd>R</kbd>) of trajectories or auto-spin loops directly to your downloads.
 - ❓ **Interactive Help & Controls Overlay** *(added in v0.2.0)*: Built-in cheatsheet of all keyboard and mouse interactions (toggle with <kbd>H</kbd> or the <kbd>?</kbd> button).
+- 🚀 **High-Density Scalability & Battery Efficiency** *(added in v0.3.3)*: Shared singleton WebGL architecture completely eliminates browser WebGL context limits (no more crashed "sad face" canvases when opening dozens of viewers). Features automated viewport hibernation (`IntersectionObserver`) and demand-driven rendering to keep idle GPU and CPU usage at ~0%.
 
 ---
 

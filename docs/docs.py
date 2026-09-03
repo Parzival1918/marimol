@@ -32,6 +32,8 @@ def _():
 
     It enables two-way reactivity with marimo, allowing you to select atoms or scrub through trajectories and immediately react to those interactions in downstream notebook cells.
 
+    It features a high-performance shared WebGL rendering architecture *(added in v0.3.3)* with automatic viewport hibernation and demand-driven rendering, allowing you to embed dozens of 3D molecular viewers in a single notebook without hitting browser WebGL context limits or draining your GPU.
+
     ---
 
     ## Installation
