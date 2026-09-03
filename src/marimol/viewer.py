@@ -148,6 +148,48 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                 return sprite;
             };
 
+            const createVectorLabel = (text, color, pos) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const fontSize = 48;
+                ctx.font = `bold ${fontSize}px sans-serif`;
+                const metrics = ctx.measureText(text);
+                const textWidth = metrics.width;
+                const paddingX = 20;
+                const paddingY = 14;
+                canvas.width = Math.max(64, Math.ceil(textWidth + paddingX * 2));
+                canvas.height = Math.max(64, Math.ceil(fontSize + paddingY * 2));
+
+                ctx.font = `bold ${fontSize}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                const cx = canvas.width / 2;
+                const cy = canvas.height / 2;
+
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 8;
+                ctx.lineJoin = 'round';
+                ctx.miterLimit = 2;
+                ctx.strokeText(text, cx, cy);
+
+                ctx.fillStyle = color || '#000000';
+                ctx.fillText(text, cx, cy);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.minFilter = THREE.LinearFilter;
+                const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true });
+                const sprite = new THREE.Sprite(spriteMat);
+                sprite.position.copy(pos);
+                sprite.name = text;
+
+                const worldHeight = 0.35;
+                const aspect = canvas.width / canvas.height;
+                sprite.scale.set(worldHeight * aspect, worldHeight, 1.0);
+                sprite.renderOrder = 10;
+                return sprite;
+            };
+
             const xLbl = createLabel('X', '#ff4444', new THREE.Vector3(1.8, 0, 0), true);
             xLbl.scale.set(1.2, 1.2, 1.2); axesScene.add(xLbl);
 
@@ -2067,6 +2109,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                     const defaultVecWidth = model.get('vector_width') || 0.08;
                     const defaultVecOutline = model.get('vector_outline') || false;
                     const defaultVecColor = model.get('vector_color') || '#ff0000';
+                    const defaultVecLabelPos = (model.get('vector_label_pos') !== undefined && model.get('vector_label_pos') !== null) ? Number(model.get('vector_label_pos')) : 0.5;
 
                     for (let i = 0; i < vectors.length; i++) {
                         const v = vectors[i];
@@ -2085,6 +2128,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                         const vWidth = (v.width !== undefined && v.width !== null) ? v.width : ((fData.vector_width !== undefined && fData.vector_width !== null) ? fData.vector_width : defaultVecWidth);
                         const vOutline = (v.outline !== undefined && v.outline !== null) ? v.outline : ((fData.vector_outline !== undefined && fData.vector_outline !== null) ? fData.vector_outline : defaultVecOutline);
                         const vColor = (v.color !== undefined && v.color !== null) ? v.color : ((fData.vector_color !== undefined && fData.vector_color !== null) ? fData.vector_color : defaultVecColor);
+                        const vLabelPos = (v.label_pos !== undefined && v.label_pos !== null) ? Number(v.label_pos) : ((fData.vector_label_pos !== undefined && fData.vector_label_pos !== null) ? Number(fData.vector_label_pos) : defaultVecLabelPos);
 
                         const vA = new THREE.Vector3().fromArray(origArr);
                         const vB = new THREE.Vector3().fromArray(endArr);
@@ -2146,6 +2190,15 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
                                 headOutMesh.position.copy(vA).addScaledVector(vDir, hShaft + hHead / 2);
                                 headOutMesh.renderOrder = 1;
                                 vectorGroup.add(headOutMesh);
+                            }
+                        }
+
+                        if (v.label !== undefined && v.label !== null) {
+                            const labelStr = String(v.label);
+                            if (labelStr.length > 0) {
+                                const labelPos = vA.clone().lerp(vB, vLabelPos);
+                                const lblSprite = createVectorLabel(labelStr, vColor, labelPos);
+                                vectorGroup.add(lblSprite);
                             }
                         }
                     }
@@ -2282,6 +2335,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
             model.on("change:vector_width", () => updateScene(false));
             model.on("change:vector_outline", () => updateScene(false));
             model.on("change:vector_color", () => updateScene(false));
+            model.on("change:vector_label_pos", () => updateScene(false));
             model.on("change:structure_transparency", () => updateScene(false));
             model.on("change:multi_traj", () => {
                 const showPlay = model.get('multi_traj') !== false;
@@ -2713,6 +2767,7 @@ class MoleculeViewerWidget(anywidget.AnyWidget):
     vector_width = traitlets.Float(0.08).tag(sync=True)
     vector_outline = traitlets.Any(default_value=False).tag(sync=True)
     vector_color = traitlets.Unicode("red").tag(sync=True)
+    vector_label_pos = traitlets.Float(0.5).tag(sync=True)
     structure_transparency = traitlets.Float(0.0).tag(sync=True)
     spin = traitlets.Bool(False).tag(sync=True)
     spin_axis = traitlets.List(default_value=[0.0, 1.0, 0.0]).tag(sync=True)
@@ -2773,6 +2828,7 @@ DEFAULT_VIEWER_CONFIG = {
     "vector_width": 0.08,
     "vector_outline": False,
     "vector_color": "red",
+    "vector_label_pos": 0.5,
     "structure_transparency": 0.0,
     "spin": False,
     "spin_axis": (0.0, 1.0, 0.0),
@@ -2797,6 +2853,7 @@ def _prepare_frames_data(
     vector_width: float,
     vector_outline: bool | str,
     resolved_vector_color: str,
+    vector_label_pos: float = 0.5,
 ) -> list[dict]:
     """Preprocess frame dictionaries for physical properties, unwrapping, bonds, and vectors."""
     if compute_extra_data:
@@ -2826,6 +2883,7 @@ def _prepare_frames_data(
                 default_width=vector_width,
                 default_outline=vector_outline,
                 default_color=resolved_vector_color,
+                default_label_pos=vector_label_pos,
             )
         processed_frames.append(f_dict)
 
@@ -2853,6 +2911,7 @@ def view_structure(
     vector_width: float = _UNSET,
     vector_outline: bool | str = _UNSET,
     vector_color: str = _UNSET,
+    vector_label_pos: float = _UNSET,
     spin: bool = _UNSET,
     spin_axis: tuple[float, float, float] | list[float] = _UNSET,
     spin_speed: float = _UNSET,
@@ -2919,6 +2978,8 @@ def view_structure(
         Whether to draw outlines around 3D vector arrows (or outline color string). Default is False. *(added in v0.3.0)*
     vector_color : str, optional
         Default color name or hex code for 3D vector arrows. Default is "red". *(added in v0.3.0)*
+    vector_label_pos : float, optional
+        Position of vector labels along the 3D arrow shaft from 0.0 (tail) to 1.0 (head). Default is 0.5. *(added in v0.3.3)*
     spin : bool, optional
         Whether to spin the structure. Default is False.
     spin_axis : tuple[float, float, float] or list[float], optional
@@ -2978,6 +3039,7 @@ def view_structure(
     vector_width = _resolve(vector_width, "vector_width")
     vector_outline = _resolve(vector_outline, "vector_outline")
     vector_color = _resolve(vector_color, "vector_color")
+    vector_label_pos = _resolve(vector_label_pos, "vector_label_pos")
     spin = _resolve(spin, "spin")
     spin_axis = _resolve(spin_axis, "spin_axis")
     spin_speed = _resolve(spin_speed, "spin_speed")
@@ -3009,6 +3071,7 @@ def view_structure(
         vector_width=vector_width,
         vector_outline=vector_outline,
         resolved_vector_color=resolved_vector_color,
+        vector_label_pos=vector_label_pos,
     )
 
     sel_radius_map = VDW_RADII if use_vdw else ATOMIC_RADII
@@ -3037,6 +3100,7 @@ def view_structure(
         vector_width=vector_width,
         vector_outline=vector_outline,
         vector_color=resolved_vector_color,
+        vector_label_pos=vector_label_pos,
         spin=spin,
         spin_axis=list(spin_axis),
         spin_speed=spin_speed,

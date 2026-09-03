@@ -162,6 +162,7 @@ def _():
     | `vector_width` | `float` | `0.08` | Shaft radius / width for 3D vector arrows. *(added in v0.3.0)* |
     | `vector_outline` | `bool` \| `str` | `False` | Whether to draw outlines around 3D vector arrows (or outline color string). *(added in v0.3.0)* |
     | `vector_color` | `str` | `"red"` | Default color name or hex code for 3D vector arrows. *(added in v0.3.0)* |
+    | `vector_label_pos` | `float` | `0.5` | Position of vector labels along the 3D arrow shaft from 0.0 (tail) to 1.0 (head). *(added in v0.3.3)* |
     | `spin` | `bool` | `False` | Enables continuous automatic 3D rotation of the structure. |
     | `spin_axis` | `tuple[float, float, float]` | `(0.0, 1.0, 0.0)` | Cartesian 3D axis vector around which the structure rotates during auto-spin. |
     | `spin_speed` | `float` | `2.0` | Angular rotation speed for auto-spin (positive for clockwise, negative for counter-clockwise). |
@@ -237,18 +238,19 @@ def _():
             "point_group": "Td",
         },
 
-        # [Optional] 3D vector arrows (e.g. dipole moments, forces, spins) *(added in v0.3.0)*
+        # [Optional] 3D vector arrows (e.g. dipole moments, forces, spins) *(added in v0.3.0, labels in v0.3.3)*
         "vectors": [
-            # Arrow starting at atom 0 pointing in a given direction with explicit length
-            {"origin": 0, "direction": [0.0, 0.0, 1.0], "length": 1.5, "color": "yellow", "width": 0.10, "outline": True},
+            # Arrow with custom label and position along the shaft (0.0=tail, 1.0=head)
+            {"origin": 0, "direction": [0.0, 0.0, 1.0], "length": 1.5, "color": "yellow", "width": 0.10, "outline": True, "label": "Dipole", "label_pos": 0.5},
             # Arrow between two Cartesian coordinate positions or atom indices
-            {"origin": [0.0, 0.0, 0.0], "end": [1.0, 1.0, 0.0], "color": "cyan"},
+            {"origin": [0.0, 0.0, 0.0], "end": [1.0, 1.0, 0.0], "color": "cyan", "label": "F_1"},
         ],
 
-        # [Optional] Frame-level vector defaults *(added in v0.3.0)*
+        # [Optional] Frame-level vector defaults *(added in v0.3.0, vector_label_pos in v0.3.3)*
         "vector_width": 0.08,
         "vector_outline": False,
         "vector_color": "red",
+        "vector_label_pos": 0.5,
     }
     ```
 
@@ -827,14 +829,16 @@ def _():
     - **`origin`**: Starting point of the arrow. Can be passed as an **atom index** (integer $\ge 0$) or as **3D Cartesian coordinates** (`[x, y, z]`).
     - **`end`**: Destination point of the arrow. Can be passed as an **atom index** or **3D Cartesian coordinates**.
     - **`direction` & `length`**: Alternative to `end`. Pass `direction` as a 3D vector (`[dx, dy, dz]`) and optionally `length` as a float. If `length` is omitted, the Euclidean norm of `direction` is used.
+    - **`label`**: Optional label string displayed on the vector arrow. *(added in v0.3.3)*
+    - **`label_pos`**: Optional relative position of the label along the arrow shaft from `0.0` (tail/origin) to `1.0` (head/end). Default is `0.5` (midpoint). *(added in v0.3.3)*
 
     #### Styling & Precedence Hierarchy
 
-    Vector appearance can be configured at three levels (highest to lowest precedence):
+    Vector appearance and label positioning can be configured at three levels (highest to lowest precedence):
 
-    1. **Per-vector keys** in the vector dictionary: `width`, `outline`, `color`.
-    2. **Per-frame keys** in the data dictionary: `vector_width`, `vector_outline`, `vector_color`.
-    3. **Global arguments** in `view_structure` / config: `vector_width` (default `0.08`), `vector_outline` (default `False`), `vector_color` (default `"red"`).
+    1. **Per-vector keys** in the vector dictionary: `width`, `outline`, `color`, `label`, `label_pos`.
+    2. **Per-frame keys** in the data dictionary: `vector_width`, `vector_outline`, `vector_color`, `vector_label_pos`.
+    3. **Global arguments** in `view_structure` / config: `vector_width` (default `0.08`), `vector_outline` (default `False`), `vector_color` (default `"red"`), `vector_label_pos` (default `0.5`).
 
     The example below visualizes a live **Molecular Dynamics (MD)** trajectory of a **Gold Nanoparticle ($\text{Au}_{13}$)** with instantaneous **atomic force vectors** color-coded by magnitude, rendered with structure transparency (`structure_transparency=0.35`):
     """)

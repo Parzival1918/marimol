@@ -102,9 +102,17 @@ data = {
     "positions": [[0.0, 0.0, 0.0], [1.1, 0.0, 0.0]],
     "species": ["C", "O"],
     "bonds": [{"source": 0, "target": 1}],
-    # Optional 3D vector arrows (origin, end/direction, length, styling) *(added in v0.3.0)*
+    # Optional 3D vector arrows (origin, end/direction, length, styling, labels) *(added in v0.3.0, labels in v0.3.3)*
     "vectors": [
-        {"origin": 0, "direction": [0.0, 0.0, 1.0], "length": 1.5, "color": "yellow", "outline": True},
+        {
+            "origin": 0,
+            "direction": [0.0, 0.0, 1.0],
+            "length": 1.5,
+            "color": "yellow",
+            "outline": True,
+            "label": "Dipole",
+            "label_pos": 0.5,
+        },
     ],
 }
 
@@ -183,6 +191,7 @@ All viewer functions (`view_structure`, `view_ase`, `view_pymatgen`, `view_cspy`
 | `vector_width` | `float` | `0.08` | Shaft radius / width for 3D vector arrows. *(added in v0.3.0)* |
 | `vector_outline` | `bool` \| `str` | `False` | Whether to draw outlines around 3D vector arrows (or outline color string). *(added in v0.3.0)* |
 | `vector_color` | `str` | `"red"` | Default color name or hex code for 3D vector arrows. *(added in v0.3.0)* |
+| `vector_label_pos` | `float` | `0.5` | Position of vector labels along the 3D arrow shaft from 0.0 (tail) to 1.0 (head). *(added in v0.3.3)* |
 | `spin` | `bool` | `False` | Continuous automatic 3D rotation of the structure. |
 | `spin_axis` | `tuple[float, float, float]` | `(0.0, 1.0, 0.0)` | Cartesian 3D axis vector around which the structure rotates during spin. |
 | `spin_speed` | `float` | `2.0` | Angular rotation speed for auto-spin (positive for CW, negative for CCW). |

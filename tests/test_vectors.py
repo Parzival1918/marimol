@@ -285,3 +285,106 @@ def test_view_structure_structure_transparency(methane_dict):
     # Default is 0.0
     ui_default = view_structure(methane_dict)
     assert ui_default.widget.structure_transparency == 0.0
+
+
+def test_process_vectors_labels_and_positions(methane_dict):
+    methane_dict["vectors"] = [
+        # Vector 0: Default label_pos = 0.5
+        {"origin": 0, "end": 1, "label": "v1"},
+        # Vector 1: Explicit label_pos = 0.8
+        {"origin": 0, "end": 2, "label": "v2", "label_pos": 0.8},
+        # Vector 2: No label, but explicit label_pos
+        {"origin": 0, "end": 3, "label_pos": 0.2},
+    ]
+
+    res = process_vectors(methane_dict)
+    assert len(res) == 3
+
+    assert res[0]["label"] == "v1"
+    assert res[0]["label_pos"] == 0.5
+
+    assert res[1]["label"] == "v2"
+    assert res[1]["label_pos"] == 0.8
+
+    assert "label" not in res[2]
+    assert res[2]["label_pos"] == 0.2
+
+
+def test_process_vectors_label_pos_hierarchy():
+    # 1. Frame-level vector_label_pos
+    data_vector = {
+        "positions": [[0.0, 0.0, 0.0]],
+        "species": ["C"],
+        "vector_label_pos": 0.3,
+        "vectors": [
+            {"origin": [0.0, 0.0, 0.0], "direction": [1.0, 0.0, 0.0], "length": 1.0, "label": "F_a"},
+            {
+                "origin": [0.0, 0.0, 0.0],
+                "direction": [0.0, 1.0, 0.0],
+                "length": 1.0,
+                "label": "F_b",
+                "label_pos": 0.9,
+            },
+        ],
+    }
+    res = process_vectors(data_vector)
+    assert res[0]["label_pos"] == 0.3
+    assert res[1]["label_pos"] == 0.9
+
+    # 2. Global default_label_pos in process_vectors
+    data_plain = {
+        "positions": [[0.0, 0.0, 0.0]],
+        "species": ["C"],
+        "vectors": [
+            {"origin": [0.0, 0.0, 0.0], "direction": [1.0, 0.0, 0.0], "length": 1.0, "label": "F_a"},
+        ],
+    }
+    res2 = process_vectors(data_plain, default_label_pos=0.65)
+    assert res2[0]["label_pos"] == 0.65
+
+
+def test_process_vectors_label_pos_invalid():
+    data = {
+        "positions": [[0.0, 0.0, 0.0]],
+        "species": ["C"],
+        "vectors": [
+            {"origin": [0.0, 0.0, 0.0], "direction": [1.0, 0.0, 0.0], "length": 1.0, "label_pos": "invalid"},
+        ],
+    }
+    with pytest.raises(ValueError, match="Vector label position must be a float number"):
+        process_vectors(data)
+
+
+def test_view_structure_with_vector_labels(methane_dict):
+    methane_dict["vectors"] = [
+        {"origin": 0, "end": 1, "label": "C-H1"},
+        {"origin": 0, "end": 2, "label": "C-H2", "label_pos": 0.9},
+    ]
+
+    ui_widget = view_structure(methane_dict, vector_label_pos=0.25)
+    inner = ui_widget.widget
+    assert inner.vector_label_pos == 0.25
+
+    frame_data = inner.data[0]
+    assert frame_data["vectors"][0]["label"] == "C-H1"
+    assert frame_data["vectors"][0]["label_pos"] == 0.25
+    assert frame_data["vectors"][1]["label"] == "C-H2"
+    assert frame_data["vectors"][1]["label_pos"] == 0.9
+
+
+def test_view_structure_with_toml_config_vector_label_pos(methane_dict):
+    toml_str = """
+    vector_label_pos = 0.75
+    """
+    methane_dict["vectors"] = [{"origin": 0, "end": 1, "label": "Force"}]
+
+    ui_widget = view_structure(methane_dict, config=toml_str)
+    inner = ui_widget.widget
+    assert inner.vector_label_pos == 0.75
+    assert inner.data[0]["vectors"][0]["label_pos"] == 0.75
+
+    # Override via explicit vector_label_pos keyword argument
+    ui_widget_override = view_structure(methane_dict, config=toml_str, vector_label_pos=0.35)
+    inner_override = ui_widget_override.widget
+    assert inner_override.vector_label_pos == 0.35
+    assert inner_override.data[0]["vectors"][0]["label_pos"] == 0.35

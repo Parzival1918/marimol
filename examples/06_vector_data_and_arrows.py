@@ -124,7 +124,7 @@ def _(mo):
     # ⚡ Molecular Dynamics with Atomic Force Vectors
 
     This example demonstrates a live **Molecular Dynamics (MD)** simulation with **ASE**
-    and visualizes instantaneous atomic **force vectors** as dynamic 3D arrows with **marimol** *(added in v0.3.0)*.
+    and visualizes instantaneous atomic **force vectors** and **vector labels** as dynamic 3D arrows with **marimol** *(added in v0.3.0, vector labels in v0.3.3)*.
 
     At each integration step, the net force vector $\vec{F}_i = -\nabla_i V$ acting on each atom is displayed as a 3D arrow showing the magnitude and direction of the chemical and electrostatic restoring forces.
     """)
@@ -202,6 +202,14 @@ def _(mo):
     )
 
     outline_toggle = mo.ui.checkbox(value=True, label="✏️ Vector Outlines")
+    vector_labels_toggle = mo.ui.checkbox(value=False, label="🏷️ Vector Labels")
+    label_pos_slider = mo.ui.slider(
+        start=0.0,
+        stop=1.0,
+        step=0.05,
+        value=0.5,
+        label="📍 Label Position:",
+    )
     spin_toggle = mo.ui.checkbox(value=False, label="🔄 Auto-spin")
 
     controls = mo.vstack(
@@ -216,7 +224,7 @@ def _(mo):
                 ],
                 justify="start",
             ),
-            mo.hstack([outline_toggle, spin_toggle], justify="start"),
+            mo.hstack([outline_toggle, vector_labels_toggle, label_pos_slider, spin_toggle], justify="start"),
         ]
     )
 
@@ -226,12 +234,14 @@ def _(mo):
         controls,
         dt_slider,
         force_scale_slider,
+        label_pos_slider,
         outline_toggle,
         spin_toggle,
         steps_slider,
         system_select,
         temp_slider,
         transparency_slider,
+        vector_labels_toggle,
         vector_width_slider,
     )
 
@@ -254,6 +264,7 @@ def _(
     temp_slider,
     thermalize_momenta,
     units,
+    vector_labels_toggle,
 ):
     def _build_system(system_key: str):
         """Construct atomic structure with clean initial coordinates."""
@@ -322,14 +333,15 @@ def _(
             f_mag = f_mags[atom_idx]
             if f_mag > 1e-7:
                 col = _get_vector_color(species[atom_idx], f_mag, max_f, c_mode)
-                frame_vectors.append(
-                    {
-                        "origin": atom_idx,
-                        "direction": [float(x) for x in f_atom],
-                        "length": float(f_mag * f_scale),
-                        "color": col,
-                    }
-                )
+                vec_entry = {
+                    "origin": atom_idx,
+                    "direction": [float(x) for x in f_atom],
+                    "length": float(f_mag * f_scale),
+                    "color": col,
+                }
+                if vector_labels_toggle.value:
+                    vec_entry["label"] = f"F_{species[atom_idx]}{atom_idx}"
+                frame_vectors.append(vec_entry)
 
         frame_dict = {
             "positions": positions,
@@ -351,6 +363,7 @@ def _(
 
 @app.cell
 def _(
+    label_pos_slider,
     outline_toggle,
     spin_toggle,
     trajectory_frames,
@@ -362,6 +375,7 @@ def _(
         trajectory_frames,
         vector_width=vector_width_slider.value,
         vector_outline=outline_toggle.value,
+        vector_label_pos=label_pos_slider.value,
         structure_transparency=transparency_slider.value,
         multi_traj=True,
         trajectory_slider=True,

@@ -581,14 +581,28 @@ def _resolve_vector_geometry(
 
 
 def _resolve_vector_styling(
-    v: dict, data: dict, default_width: float, default_outline: bool | str, default_color: str
-) -> tuple[float, bool | str, str]:
-    """Helper to resolve (width, outline, color) for a vector entry."""
+    v: dict,
+    data: dict,
+    default_width: float,
+    default_outline: bool | str,
+    default_color: str,
+    default_label_pos: float = 0.5,
+) -> tuple[float, bool | str, str, str | None, float]:
+    """Helper to resolve (width, outline, color, label, label_pos) for a vector entry."""
     width = float(v.get("width", data.get("vector_width", default_width)))
     outline = v.get("outline", data.get("vector_outline", default_outline))
     raw_col = v.get("color", data.get("vector_color", default_color))
     color = resolve_color(raw_col)
-    return width, outline, color
+
+    label = str(v["label"]) if ("label" in v and v["label"] is not None) else None
+
+    raw_pos = v.get("label_pos", data.get("vector_label_pos", default_label_pos))
+    try:
+        label_pos = float(raw_pos) if raw_pos is not None else 0.5
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Vector label position must be a float number from 0 to 1, got {raw_pos!r}") from e
+
+    return width, outline, color, label, label_pos
 
 
 def process_vectors(
@@ -596,33 +610,37 @@ def process_vectors(
     default_width: float = 0.08,
     default_outline: bool | str = False,
     default_color: str = "red",
+    default_label_pos: float = 0.5,
 ) -> list[dict]:
     """
     Process and validate vector dictionaries for 3D visualization.
 
     Converts atom indices in 'origin' and 'end' to Cartesian coordinates, computes
-    vector directions and lengths, and resolves styling hierarchy (per-vector > per-frame > global defaults).
+    vector directions and lengths, and resolves styling and label hierarchy (per-vector > per-frame > global defaults).
 
-    *(added in v0.3.0)*
+    *(added in v0.3.0, vector labels added in v0.3.3)*
 
     Parameters
     ----------
     data : dict
         A structure dictionary containing 'positions' and optional 'vectors', 'vector_width',
-        'vector_outline', and 'vector_color'.
+        'vector_outline', 'vector_color', or 'vector_label_pos'.
     default_width : float, optional
         Default shaft radius / width for vectors. Default is 0.08.
     default_outline : bool or str, optional
         Default outline setting for vectors (False, True, or custom color string). Default is False.
     default_color : str, optional
         Default color name or hex code for vectors. Default is "red".
+    default_label_pos : float, optional
+        Default position for vector labels along the arrow shaft from 0.0 (tail) to 1.0 (head). Default is 0.5.
 
     Returns
     -------
     list[dict]
         A list of processed vector dictionaries ready for MoleculeViewerWidget, where each
         dictionary contains 'origin' ([x, y, z]), 'end' ([x, y, z]), 'direction' ([dx, dy, dz]),
-        'length' (float), 'width' (float), 'outline' (bool or str), and 'color' (str).
+        'length' (float), 'width' (float), 'outline' (bool or str), 'color' (str), and optional
+        'label' (str) and 'label_pos' (float).
     """
     if not isinstance(data, dict):
         return []
@@ -640,18 +658,25 @@ def process_vectors(
             raise TypeError(f"Vector entry at index {idx} must be a dictionary, got {type(v).__name__}")
 
         origin_pos, end_pos, direction, length = _resolve_vector_geometry(v, positions, num_atoms, idx)
-        width, outline, color = _resolve_vector_styling(v, data, default_width, default_outline, default_color)
-
-        processed.append(
-            {
-                "origin": origin_pos,
-                "end": end_pos,
-                "direction": direction,
-                "length": length,
-                "width": width,
-                "outline": outline,
-                "color": color,
-            }
+        width, outline, color, label, label_pos = _resolve_vector_styling(
+            v, data, default_width, default_outline, default_color, default_label_pos
         )
+
+        vec_dict: dict[str, object] = {
+            "origin": origin_pos,
+            "end": end_pos,
+            "direction": direction,
+            "length": length,
+            "width": width,
+            "outline": outline,
+            "color": color,
+        }
+        if label is not None:
+            vec_dict["label"] = label
+            vec_dict["label_pos"] = label_pos
+        elif "label_pos" in v and v["label_pos"] is not None:
+            vec_dict["label_pos"] = label_pos
+
+        processed.append(vec_dict)
 
     return processed
